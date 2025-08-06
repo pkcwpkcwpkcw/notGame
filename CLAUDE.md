@@ -8,6 +8,11 @@ A high-performance logic circuit sandbox where players can build complex systems
 1. **Puzzle Mode**: Solve logic challenges using minimal gates
 2. **Sandbox Mode**: Build massive circuits capable of simulating computer hardware (100k+ gates)
 
+### Documentation
+- [Game Specification](docs/GAME_SPEC.md) - 게임 기능 명세 및 UI 디자인
+- [C++ Architecture](docs/CPP_ARCHITECTURE.md) - 기술 스택 및 아키텍처 설계
+- [Development Roadmap](docs/ROADMAP.md) - 개발 로드맵 및 현재 진행상황
+
 ## Project Context
 
 ### Original Request
@@ -59,12 +64,12 @@ A high-performance logic circuit sandbox where players can build complex systems
 
 ### Current Stage
 프로젝트 초기 설정 완료:
-- 문서 작성 완료 (GAME_SPEC.md, CPP_ARCHITECTURE.md, ROADMAP.md)
+- 문서 작성 완료 ([GAME_SPEC.md](docs/GAME_SPEC.md), [CPP_ARCHITECTURE.md](docs/CPP_ARCHITECTURE.md), [ROADMAP.md](docs/ROADMAP.md))
 - CMakeLists.txt 생성
 - Git 저장소 초기화 및 GitHub 연결
 
 ### Next Steps
-ROADMAP.md의 Step 1부터 순차적으로 구현:
+[ROADMAP.md](docs/ROADMAP.md)의 Step 1부터 순차적으로 구현:
 1. SDL2, OpenGL 윈도우 생성
 2. 기본 이벤트 루프
 3. Dear ImGui 통합
@@ -130,7 +135,7 @@ alignas(64) uint32_t signals[MAX_SIGNALS/32];
 ## Common Development Tasks
 
 ### Adding a New Feature
-1. Check ROADMAP.md for current phase
+1. Check [ROADMAP.md](docs/ROADMAP.md) for current phase
 2. Update relevant header files first
 3. Implement in .cpp files
 4. Add to CMakeLists.txt if new files

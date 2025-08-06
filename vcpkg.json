@@ -1,0 +1,24 @@
+{
+  "name": "notgame",
+  "version": "1.0.0",
+  "description": "High-performance NOT gate logic circuit sandbox",
+  "homepage": "https://github.com/pkcwpkcwpkcw/notGame",
+  "dependencies": [
+    {
+      "name": "sdl2",
+      "features": []
+    },
+    "opengl",
+    "imgui",
+    "glm",
+    "nlohmann-json",
+    "glad"
+  ],
+  "builtin-baseline": "b0190b451303865b89ced9767caaab140c39f980",
+  "overrides": [
+    {
+      "name": "sdl2",
+      "version": "2.28.5"
+    }
+  ]
+}
