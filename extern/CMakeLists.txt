@@ -22,12 +22,11 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui.cpp")
         message(STATUS "  - ImGui SDL2 backend enabled")
     endif()
     
-    # OpenGL 백엔드는 현재 비활성화 (GLAD가 필요함)
-    # OpenGL 백엔드를 사용하려면 먼저 GLAD를 설정해야 함
-    # if(OpenGL_FOUND AND GLAD_FOUND AND EXISTS "${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp")
-    #     list(APPEND IMGUI_SOURCES ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp)
-    #     message(STATUS "  - ImGui OpenGL3 backend enabled")
-    # endif()
+    # OpenGL 백엔드 (OpenGL과 GLAD가 있을 경우)
+    if(OpenGL_FOUND AND EXISTS "${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp")
+        list(APPEND IMGUI_SOURCES ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp)
+        message(STATUS "  - ImGui OpenGL3 backend enabled")
+    endif()
     
     # Win32 백엔드 (Windows에서 SDL2가 없을 경우)
     if(WIN32 AND NOT SDL2_FOUND AND EXISTS "${IMGUI_DIR}/backends/imgui_impl_win32.cpp")
@@ -42,6 +41,11 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui.cpp")
         ${IMGUI_DIR}/backends
     )
     
+    # Add GLAD include directory FIRST (before SDL2/OpenGL to ensure proper header inclusion)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/glad/include")
+        target_include_directories(imgui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/glad/include)
+    endif()
+    
     if(SDL2_FOUND)
         target_include_directories(imgui PUBLIC ${SDL2_INCLUDE_DIRS})
         target_link_libraries(imgui PUBLIC ${SDL2_LIBRARIES})
@@ -49,7 +53,8 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui.cpp")
     
     if(OpenGL_FOUND)
         target_include_directories(imgui PUBLIC ${OPENGL_INCLUDE_DIR})
-        target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_LOADER_CUSTOM)
+        # Tell ImGui to use GLAD as the OpenGL loader
+        target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_LOADER_GLAD)
     endif()
     
     # Set ImGui variables for parent scope

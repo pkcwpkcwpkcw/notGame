@@ -14,11 +14,18 @@ if(CORE_SOURCES)
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/extern
         ${SDL2_INCLUDE_DIRS}
+        ${CMAKE_SOURCE_DIR}/extern/imgui
+        ${CMAKE_SOURCE_DIR}/extern/imgui/backends
+        ${CMAKE_SOURCE_DIR}/extern/glad/include
     )
     target_link_libraries(notgate_core
         ${SDL2_LIBRARIES}
+        ${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows/lib/SDL2.lib
         notgate_utils
     )
+    if(TARGET imgui)
+        target_link_libraries(notgate_core imgui)
+    endif()
 else()
     # 소스 파일이 없으면 인터페이스 라이브러리로 생성
     add_library(notgate_core INTERFACE)

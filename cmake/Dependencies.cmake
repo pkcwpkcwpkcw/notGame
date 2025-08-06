@@ -39,6 +39,8 @@ if(USE_SDL2)
         # 수동 경로 확인
         if(WIN32)
             set(SDL2_SEARCH_PATHS
+                "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows"
+                "${CMAKE_BINARY_DIR}/vcpkg_installed/x86-windows"
                 "C:/SDL2"
                 "C:/Libraries/SDL2"
                 "${CMAKE_SOURCE_DIR}/extern/SDL2"

@@ -1,40 +1,53 @@
 #include "core/Application.h"
-#include "utils/Logger.h"
 #include <iostream>
-#include <cstdlib>
+#include <SDL.h>
 
-int main(int /*argc*/, char* /*argv*/[]) {
-    std::cout << "Starting NOT Gate Sandbox..." << std::endl;
+#ifdef _WIN32
+    #include <windows.h>
+    #ifdef main
+        #undef main
+    #endif
+#endif
+
+int main(int argc, char* argv[]) {
+    SDL_LogSetAllPriority(SDL_LOG_PRIORITY_VERBOSE);
     
-    // Initialize logger
-    Logger::Initialize("notgate.log");
-    Logger::SetMinLevel(LogLevel::DEBUG);
+    AppConfig config;
+    config.windowWidth = 1280;
+    config.windowHeight = 720;
+    config.windowTitle = "NOT Gate Game";
+    config.fullscreen = false;
+    config.vsync = true;
+    config.targetFPS = 60;
     
-    std::cout << "Logger initialized" << std::endl;
-    
-    Logger::Info("=================================");
-    Logger::Info("   NOT Gate Sandbox v0.1.0      ");
-    Logger::Info("=================================");
-    Logger::Info("Build: " + std::string(__DATE__) + " " + std::string(__TIME__));
-    
-    std::cout << "Creating application..." << std::endl;
-    
-    // Create and run application
-    Application app;
-    
-    std::cout << "Application created, initializing..." << std::endl;
-    
-    if (!app.Initialize()) {
-        Logger::Critical("Failed to initialize application");
-        Logger::Shutdown();
-        return EXIT_FAILURE;
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        
+        if (arg == "--fullscreen") {
+            config.fullscreen = true;
+        } else if (arg == "--no-vsync") {
+            config.vsync = false;
+        } else if (arg == "--fps" && i + 1 < argc) {
+            config.targetFPS = std::stoi(argv[++i]);
+        } else if (arg == "--width" && i + 1 < argc) {
+            config.windowWidth = std::stoi(argv[++i]);
+        } else if (arg == "--height" && i + 1 < argc) {
+            config.windowHeight = std::stoi(argv[++i]);
+        }
     }
     
-    app.Run();
-    app.Shutdown();
+    {
+        Application app;
+        
+        if (!app.initialize(config)) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, 
+                        "Failed to initialize application");
+            return -1;
+        }
+        
+        app.run();
+    }
     
-    Logger::Info("Application terminated successfully");
-    Logger::Shutdown();
-    
-    return EXIT_SUCCESS;
+    SDL_Log("Program terminated successfully");
+    return 0;
 }

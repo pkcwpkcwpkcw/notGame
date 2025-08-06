@@ -1,7 +1,9 @@
-# FindSDL2.cmake - Find SDL2 library for Windows with MSYS2/MinGW
+# FindSDL2.cmake - Find SDL2 library for Windows with MSYS2/MinGW/vcpkg
 
-# SDL2 library paths for MSYS2
+# SDL2 library paths - vcpkg를 우선으로 검색
 set(SDL2_SEARCH_PATHS
+    "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows"
+    "${CMAKE_BINARY_DIR}/vcpkg_installed/x86-windows"
     "C:/msys64/ucrt64"
     "C:/msys64/mingw64"
 )

@@ -1,36 +1,80 @@
 #pragma once
 
+#include <SDL.h>
+#include <glad/glad.h>
 #include <memory>
 #include <string>
 
-class Window;
-class Renderer;
+class EventSystem;
+class Timer;
+
+enum class AppState {
+    INITIALIZING,
+    MENU,
+    PLAYING,
+    PAUSED,
+    EDITOR,
+    SHUTTING_DOWN
+};
+
+struct AppConfig {
+    int windowWidth = 1280;
+    int windowHeight = 720;
+    std::string windowTitle = "NOT Gate Game";
+    bool fullscreen = false;
+    bool vsync = true;
+    int targetFPS = 60;
+    int glMajorVersion = 3;
+    int glMinorVersion = 3;
+};
 
 class Application {
 public:
     Application();
     ~Application();
-
-    bool Initialize();
-    void Run();
-    void Shutdown();
-
-    static Application* GetInstance() { return s_instance; }
-
+    
+    bool initialize(const AppConfig& config);
+    void run();
+    void shutdown();
+    
+    void setState(AppState newState);
+    AppState getState() const { return m_currentState; }
+    
+    bool isRunning() const { return m_running; }
+    void quit() { m_running = false; }
+    
+    SDL_Window* getWindow() const { return m_window; }
+    SDL_GLContext getGLContext() const { return m_glContext; }
+    
 private:
-    void HandleEvents();
-    void Update(float deltaTime);
-    void Render();
-
-    bool m_isRunning;
-    bool m_isInitialized;
+    bool initializeSDL();
+    bool createWindow(const AppConfig& config);
+    bool createGLContext(const AppConfig& config);
+    bool initializeGLEW();
+    bool initializeImGui();
     
-    std::unique_ptr<Window> m_window;
-    std::unique_ptr<Renderer> m_renderer;
+    void handleEvents();
+    void update(float deltaTime);
+    void render();
+    void regulateFrameRate();
     
-    uint32_t m_lastFrameTime;
-    uint32_t m_currentFrameTime;
-    float m_deltaTime;
+    void cleanupImGui();
+    void cleanupGL();
+    void cleanupSDL();
     
-    static Application* s_instance;
+private:
+    SDL_Window* m_window;
+    SDL_GLContext m_glContext;
+    
+    AppConfig m_config;
+    
+    bool m_running;
+    AppState m_currentState;
+    
+    std::unique_ptr<EventSystem> m_eventSystem;
+    std::unique_ptr<Timer> m_timer;
+    
+    uint32_t m_frameCount;
+    float m_fpsUpdateTimer;
+    float m_currentFPS;
 };

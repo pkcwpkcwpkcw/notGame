@@ -1,170 +1,349 @@
 #include "Application.h"
-#include "../render/Window.h"
-#include "../render/Renderer.h"
-#include "../utils/Logger.h"
-
+#include "EventSystem.h"
+#include "Timer.h"
+#include <imgui.h>
+#include <backends/imgui_impl_sdl2.h>
+#include <backends/imgui_impl_opengl3.h>
 #include <iostream>
 
-#ifdef HAS_SDL2
-#include <SDL.h>
-#endif
-
-Application* Application::s_instance = nullptr;
-
 Application::Application()
-    : m_isRunning(false)
-    , m_isInitialized(false)
-    , m_lastFrameTime(0)
-    , m_currentFrameTime(0)
-    , m_deltaTime(0.0f)
-{
-    s_instance = this;
+    : m_window(nullptr)
+    , m_glContext(nullptr)
+    , m_running(false)
+    , m_currentState(AppState::INITIALIZING)
+    , m_frameCount(0)
+    , m_fpsUpdateTimer(0.0f)
+    , m_currentFPS(0.0f) {
 }
 
 Application::~Application() {
-    if (m_isInitialized) {
-        Shutdown();
-    }
-    s_instance = nullptr;
+    shutdown();
 }
 
-bool Application::Initialize() {
-    Logger::Info("Initializing NOT Gate Sandbox v0.1.0");
+bool Application::initialize(const AppConfig& config) {
+    m_config = config;
     
-#ifdef HAS_SDL2
-    // Initialize SDL2 with error checking
-    int sdlResult = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
-    if (sdlResult < 0) {
-        std::string error = SDL_GetError();
-        Logger::Error("Failed to initialize SDL2: " + error);
-        std::cerr << "SDL_Init failed: " << error << std::endl;
+    if (!initializeSDL()) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to initialize SDL");
         return false;
     }
-    Logger::Info("SDL2 initialized successfully");
-#else
-    Logger::Warning("SDL2 not available, running in console mode");
-#endif
-
-    m_window = std::make_unique<Window>();
-    if (!m_window->Create("NOT Gate Sandbox v0.1.0", 1280, 720)) {
-        Logger::Error("Failed to create window");
-        return false;
-    }
-    Logger::Info("Window created successfully");
-
-    m_renderer = std::make_unique<Renderer>();
-    if (!m_renderer->Initialize(m_window.get())) {
-        Logger::Error("Failed to initialize renderer");
-        return false;
-    }
-    Logger::Info("Renderer initialized successfully");
-
-    m_isInitialized = true;
-    m_isRunning = true;
     
-    Logger::Info("Application initialized successfully");
+    if (!createWindow(config)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to create window");
+        return false;
+    }
+    
+    if (!createGLContext(config)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to create OpenGL context");
+        return false;
+    }
+    
+    if (!initializeGLEW()) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to initialize GLEW");
+        return false;
+    }
+    
+    if (!initializeImGui()) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to initialize ImGui");
+        return false;
+    }
+    
+    m_eventSystem = std::make_unique<EventSystem>();
+    m_timer = std::make_unique<Timer>(config.targetFPS);
+    
+    glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    m_currentState = AppState::MENU;
+    m_running = true;
+    
+    SDL_Log("Application initialized successfully");
     return true;
 }
 
-void Application::Run() {
-    if (!m_isInitialized) {
-        Logger::Error("Cannot run application - not initialized");
-        return;
+bool Application::initializeSDL() {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) < 0) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_Init failed: %s", SDL_GetError());
+        return false;
     }
+    
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+    
+    SDL_Log("SDL initialized");
+    return true;
+}
 
-    Logger::Info("Starting main loop");
+bool Application::createWindow(const AppConfig& config) {
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, config.glMajorVersion);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, config.glMinorVersion);
     
-#ifdef HAS_SDL2
-    m_lastFrameTime = SDL_GetTicks();
+    Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+    if (config.fullscreen) {
+        windowFlags |= SDL_WINDOW_FULLSCREEN;
+    }
     
-    while (m_isRunning) {
-        m_currentFrameTime = SDL_GetTicks();
-        m_deltaTime = (m_currentFrameTime - m_lastFrameTime) / 1000.0f;
-        m_lastFrameTime = m_currentFrameTime;
+    m_window = SDL_CreateWindow(
+        config.windowTitle.c_str(),
+        SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_CENTERED,
+        config.windowWidth,
+        config.windowHeight,
+        windowFlags
+    );
+    
+    if (!m_window) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_CreateWindow failed: %s", SDL_GetError());
+        return false;
+    }
+    
+    SDL_Log("Window created: %dx%d", config.windowWidth, config.windowHeight);
+    return true;
+}
+
+bool Application::createGLContext(const AppConfig& config) {
+    m_glContext = SDL_GL_CreateContext(m_window);
+    if (!m_glContext) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_GL_CreateContext failed: %s", SDL_GetError());
+        return false;
+    }
+    
+    SDL_GL_MakeCurrent(m_window, m_glContext);
+    
+    if (config.vsync) {
+        if (SDL_GL_SetSwapInterval(1) < 0) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Failed to enable VSync: %s", SDL_GetError());
+        } else {
+            SDL_Log("VSync enabled");
+        }
+    } else {
+        SDL_GL_SetSwapInterval(0);
+        SDL_Log("VSync disabled");
+    }
+    
+    SDL_Log("OpenGL context created");
+    return true;
+}
+
+bool Application::initializeGLEW() {
+    // GLAD 사용
+    if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to initialize GLAD");
+        return false;
+    }
+    
+    SDL_Log("GLAD initialized");
+    SDL_Log("OpenGL Version: %s", glGetString(GL_VERSION));
+    SDL_Log("GLSL Version: %s", glGetString(GL_SHADING_LANGUAGE_VERSION));
+    SDL_Log("Renderer: %s", glGetString(GL_RENDERER));
+    
+    return true;
+}
+
+bool Application::initializeImGui() {
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    
+    ImGui::StyleColorsDark();
+    
+    if (!ImGui_ImplSDL2_InitForOpenGL(m_window, m_glContext)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "ImGui_ImplSDL2_InitForOpenGL failed");
+        return false;
+    }
+    
+    const char* glsl_version = "#version 330";
+    if (!ImGui_ImplOpenGL3_Init(glsl_version)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "ImGui_ImplOpenGL3_Init failed");
+        return false;
+    }
+    
+    SDL_Log("ImGui initialized");
+    return true;
+}
+
+void Application::run() {
+    SDL_Log("Main loop started");
+    
+    while (m_running) {
+        m_timer->beginFrame();
         
-        HandleEvents();
-        Update(m_deltaTime);
-        Render();
+        handleEvents();
+        update(m_timer->getDeltaTime());
+        render();
         
-        // Frame rate limiting (60 FPS)
-        uint32_t frameTime = SDL_GetTicks() - m_currentFrameTime;
-        if (frameTime < 16) {
-            SDL_Delay(16 - frameTime);
+        m_timer->endFrame();
+        regulateFrameRate();
+        
+        m_frameCount++;
+        m_fpsUpdateTimer += m_timer->getDeltaTime();
+        if (m_fpsUpdateTimer >= 1.0f) {
+            m_currentFPS = m_frameCount / m_fpsUpdateTimer;
+            m_frameCount = 0;
+            m_fpsUpdateTimer = 0.0f;
+            
+            std::string title = m_config.windowTitle + " - FPS: " + std::to_string(static_cast<int>(m_currentFPS));
+            SDL_SetWindowTitle(m_window, title.c_str());
         }
     }
-#else
-    Logger::Warning("No windowing system available - exiting");
-#endif
     
-    Logger::Info("Main loop ended");
+    SDL_Log("Main loop ended");
 }
 
-void Application::Shutdown() {
-    if (!m_isInitialized) {
-        return;
-    }
-
-    Logger::Info("Shutting down application");
-    
-    m_isRunning = false;
-    
-    if (m_renderer) {
-        m_renderer->Shutdown();
-        m_renderer.reset();
-    }
-    
-    if (m_window) {
-        m_window->Destroy();
-        m_window.reset();
-    }
-    
-#ifdef HAS_SDL2
-    SDL_Quit();
-    Logger::Info("SDL2 shutdown complete");
-#endif
-    
-    m_isInitialized = false;
-    Logger::Info("Application shutdown complete");
-}
-
-void Application::HandleEvents() {
-#ifdef HAS_SDL2
+void Application::handleEvents() {
     SDL_Event event;
+    
     while (SDL_PollEvent(&event)) {
-        switch (event.type) {
-            case SDL_QUIT:
-                m_isRunning = false;
-                break;
-                
-            case SDL_WINDOWEVENT:
-                if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
-                    int width = event.window.data1;
-                    int height = event.window.data2;
-                    m_window->HandleResize(width, height);
-                    m_renderer->SetViewport(0, 0, width, height);
-                }
-                break;
-                
-            case SDL_KEYDOWN:
-                if (event.key.keysym.sym == SDLK_ESCAPE) {
-                    m_isRunning = false;
-                }
-                break;
+        ImGui_ImplSDL2_ProcessEvent(&event);
+        
+        ImGuiIO& io = ImGui::GetIO();
+        bool imguiCapturedMouse = io.WantCaptureMouse;
+        bool imguiCapturedKeyboard = io.WantCaptureKeyboard;
+        
+        if (event.type == SDL_QUIT) {
+            m_running = false;
+            return;
+        }
+        
+        if (event.type == SDL_WINDOWEVENT) {
+            if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+                int width = event.window.data1;
+                int height = event.window.data2;
+                glViewport(0, 0, width, height);
+                SDL_Log("Window resized: %dx%d", width, height);
+            }
+        }
+        
+        if (!imguiCapturedKeyboard && event.type == SDL_KEYDOWN) {
+            switch (event.key.keysym.sym) {
+                case SDLK_ESCAPE:
+                    if (m_currentState == AppState::PLAYING) {
+                        setState(AppState::PAUSED);
+                    } else if (m_currentState == AppState::PAUSED) {
+                        setState(AppState::PLAYING);
+                    }
+                    break;
+                    
+                case SDLK_F11:
+                    {
+                        Uint32 flags = SDL_GetWindowFlags(m_window);
+                        if (flags & SDL_WINDOW_FULLSCREEN) {
+                            SDL_SetWindowFullscreen(m_window, 0);
+                        } else {
+                            SDL_SetWindowFullscreen(m_window, SDL_WINDOW_FULLSCREEN);
+                        }
+                    }
+                    break;
+            }
+        }
+        
+        if (!imguiCapturedMouse || !imguiCapturedKeyboard) {
+            m_eventSystem->processEvent(event);
         }
     }
-#endif
 }
 
-void Application::Update(float /*deltaTime*/) {
-    // Future: Update game logic here
+void Application::update(float deltaTime) {
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplSDL2_NewFrame();
+    ImGui::NewFrame();
+    
+    switch (m_currentState) {
+        case AppState::MENU:
+            ImGui::Begin("Main Menu");
+            ImGui::Text("NOT Gate Game");
+            if (ImGui::Button("Play")) {
+                setState(AppState::PLAYING);
+            }
+            if (ImGui::Button("Editor")) {
+                setState(AppState::EDITOR);
+            }
+            if (ImGui::Button("Quit")) {
+                m_running = false;
+            }
+            ImGui::End();
+            break;
+            
+        case AppState::PLAYING:
+            break;
+            
+        case AppState::PAUSED:
+            ImGui::Begin("Paused");
+            if (ImGui::Button("Resume")) {
+                setState(AppState::PLAYING);
+            }
+            if (ImGui::Button("Main Menu")) {
+                setState(AppState::MENU);
+            }
+            ImGui::End();
+            break;
+            
+        case AppState::EDITOR:
+            break;
+            
+        default:
+            break;
+    }
+    
+    m_eventSystem->update();
 }
 
-void Application::Render() {
-    m_renderer->BeginFrame();
-    m_renderer->Clear(0.1f, 0.1f, 0.15f, 1.0f);
+void Application::render() {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    // Future: Render game objects here
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     
-    m_renderer->EndFrame();
-    m_window->SwapBuffers();
+    SDL_GL_SwapWindow(m_window);
+}
+
+void Application::regulateFrameRate() {
+    m_timer->waitForTargetFPS();
+}
+
+void Application::setState(AppState newState) {
+    m_currentState = newState;
+    SDL_Log("State changed to: %d", static_cast<int>(newState));
+}
+
+void Application::shutdown() {
+    if (!m_running && m_currentState == AppState::SHUTTING_DOWN) {
+        return;
+    }
+    
+    m_running = false;
+    m_currentState = AppState::SHUTTING_DOWN;
+    
+    cleanupImGui();
+    cleanupGL();
+    cleanupSDL();
+    
+    SDL_Log("Application shutdown complete");
+}
+
+void Application::cleanupImGui() {
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
+}
+
+void Application::cleanupGL() {
+    if (m_glContext) {
+        SDL_GL_DeleteContext(m_glContext);
+        m_glContext = nullptr;
+    }
+}
+
+void Application::cleanupSDL() {
+    if (m_window) {
+        SDL_DestroyWindow(m_window);
+        m_window = nullptr;
+    }
+    
+    SDL_Quit();
 }
