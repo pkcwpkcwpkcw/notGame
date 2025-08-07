@@ -2,6 +2,9 @@
 #include "EventSystem.h"
 #include "Timer.h"
 #include "ui/ImGuiManager.h"
+#include "../render/GridRenderer.h"
+#include "../render/Camera.h"
+#include "../render/InputHandler.h"
 #include <imgui.h>
 #include <iostream>
 
@@ -49,6 +52,16 @@ bool Application::initialize(const AppConfig& config) {
     
     m_eventSystem = std::make_unique<EventSystem>();
     m_timer = std::make_unique<Timer>(config.targetFPS);
+    
+    m_camera = std::make_unique<Camera>(config.windowWidth, config.windowHeight);
+    m_gridRenderer = std::make_unique<GridRenderer>();
+    
+    if (!m_gridRenderer->Initialize(config.windowWidth, config.windowHeight)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to initialize grid renderer");
+        return false;
+    }
+    
+    m_inputHandler = std::make_unique<InputHandler>(*m_camera, *m_gridRenderer);
     
     glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
     glEnable(GL_BLEND);
@@ -202,6 +215,12 @@ void Application::handleEvents() {
                 int width = event.window.data1;
                 int height = event.window.data2;
                 glViewport(0, 0, width, height);
+                if (m_camera) {
+                    m_camera->SetScreenSize(width, height);
+                }
+                if (m_gridRenderer) {
+                    m_gridRenderer->OnResize(width, height);
+                }
                 SDL_Log("Window resized: %dx%d", width, height);
             }
         }
@@ -229,17 +248,48 @@ void Application::handleEvents() {
             }
         }
         
-        if (!imguiCapturedMouse || !imguiCapturedKeyboard) {
+        // Handle input based on event type
+        bool shouldProcessEvent = false;
+        
+        // Mouse events - only process if ImGui doesn't want mouse
+        if ((event.type == SDL_MOUSEMOTION || 
+             event.type == SDL_MOUSEBUTTONDOWN || 
+             event.type == SDL_MOUSEBUTTONUP || 
+             event.type == SDL_MOUSEWHEEL) && !imguiCapturedMouse) {
+            shouldProcessEvent = true;
+        }
+        
+        // Keyboard events - only process if ImGui doesn't want keyboard
+        if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && !imguiCapturedKeyboard) {
+            shouldProcessEvent = true;
+        }
+        
+        // Window events always process
+        if (event.type == SDL_WINDOWEVENT) {
+            shouldProcessEvent = true;
+        }
+        
+        if (shouldProcessEvent) {
+            if (m_inputHandler) {
+                m_inputHandler->HandleEvent(event);
+            }
             m_eventSystem->processEvent(event);
         }
     }
 }
 
 void Application::update(float deltaTime) {
+    if (m_inputHandler) {
+        m_inputHandler->Update(deltaTime);
+    }
+    
     m_imguiManager->BeginFrame();
+    
+    static bool editorInitialized = false;
     
     switch (m_currentState) {
         case AppState::MENU:
+            editorInitialized = false;  // Reset when returning to menu
             ImGui::Begin("Main Menu");
             ImGui::Text("NOT Gate Game");
             if (ImGui::Button("Play")) {
@@ -258,6 +308,12 @@ void Application::update(float deltaTime) {
             break;
             
         case AppState::PLAYING:
+            // Set limited grid for stage mode (example: 20x20 grid)
+            if (m_camera && !m_camera->IsGridUnlimited()) {
+                // Grid is already limited
+            } else if (m_camera) {
+                m_camera->SetGridBounds(glm::ivec2(-10, -10), glm::ivec2(9, 9));
+            }
             break;
             
         case AppState::PAUSED:
@@ -272,6 +328,45 @@ void Application::update(float deltaTime) {
             break;
             
         case AppState::EDITOR:
+            // Editor mode starts with unlimited grid but can be changed by user
+            if (!editorInitialized && m_camera) {
+                m_camera->SetUnlimitedGrid(true);
+                editorInitialized = true;
+            }
+            
+            // Show editor info
+            ImGui::Begin("Editor Mode");
+            ImGui::Text("Sandbox Mode - Unlimited Grid");
+            ImGui::Text("Camera Position: (%.2f, %.2f)", 
+                m_camera ? m_camera->GetPosition().x : 0.0f,
+                m_camera ? m_camera->GetPosition().y : 0.0f);
+            ImGui::Text("Zoom: %.2fx", m_camera ? m_camera->GetZoom() : 1.0f);
+            ImGui::Separator();
+            
+            if (ImGui::Button("Test Limited Grid (10x10)")) {
+                if (m_camera) {
+                    m_camera->SetGridBounds(glm::ivec2(-5, -5), glm::ivec2(4, 4));
+                    m_camera->Reset();
+                    SDL_Log("Set 10x10 grid bounds: min(-5,-5) max(4,4), unlimited=%d", 
+                            m_camera->IsGridUnlimited() ? 1 : 0);
+                }
+            }
+            if (ImGui::Button("Test Limited Grid (50x50)")) {
+                if (m_camera) {
+                    m_camera->SetGridBounds(glm::ivec2(-25, -25), glm::ivec2(24, 24));
+                    m_camera->Reset();
+                }
+            }
+            if (ImGui::Button("Unlimited Grid")) {
+                if (m_camera) {
+                    m_camera->SetUnlimitedGrid(true);
+                }
+            }
+            
+            if (ImGui::Button("Back to Menu")) {
+                setState(AppState::MENU);
+            }
+            ImGui::End();
             break;
             
         default:
@@ -284,6 +379,10 @@ void Application::update(float deltaTime) {
 void Application::render() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
+    if (m_gridRenderer && m_camera && (m_currentState == AppState::PLAYING || m_currentState == AppState::EDITOR)) {
+        m_gridRenderer->Render(*m_camera);
+    }
+    
     m_imguiManager->EndFrame();
     
     SDL_GL_SwapWindow(m_window);
@@ -294,6 +393,11 @@ void Application::regulateFrameRate() {
 }
 
 void Application::setState(AppState newState) {
+    // Reset editor initialization flag when leaving editor mode
+    if (m_currentState == AppState::EDITOR && newState != AppState::EDITOR) {
+        // This will be reset in the EDITOR case statement
+    }
+    
     m_currentState = newState;
     SDL_Log("State changed to: %d", static_cast<int>(newState));
 }
@@ -321,6 +425,11 @@ void Application::cleanupImGui() {
 }
 
 void Application::cleanupGL() {
+    if (m_gridRenderer) {
+        m_gridRenderer->Shutdown();
+        m_gridRenderer.reset();
+    }
+    
     if (m_glContext) {
         SDL_GL_DeleteContext(m_glContext);
         m_glContext = nullptr;

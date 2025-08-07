@@ -17,6 +17,7 @@ if(CORE_SOURCES)
         ${CMAKE_SOURCE_DIR}/extern/imgui
         ${CMAKE_SOURCE_DIR}/extern/imgui/backends
         ${CMAKE_SOURCE_DIR}/extern/glad/include
+        ${GLM_INCLUDE_DIR}
     )
     target_link_libraries(notgate_core
         ${SDL2_LIBRARIES}

@@ -8,6 +8,9 @@
 class EventSystem;
 class Timer;
 class ImGuiManager;
+class GridRenderer;
+class Camera;
+class InputHandler;
 
 enum class AppState {
     INITIALIZING,
@@ -75,6 +78,10 @@ private:
     std::unique_ptr<EventSystem> m_eventSystem;
     std::unique_ptr<Timer> m_timer;
     std::unique_ptr<ImGuiManager> m_imguiManager;
+    
+    std::unique_ptr<GridRenderer> m_gridRenderer;
+    std::unique_ptr<Camera> m_camera;
+    std::unique_ptr<InputHandler> m_inputHandler;
     
     uint32_t m_frameCount;
     float m_fpsUpdateTimer;

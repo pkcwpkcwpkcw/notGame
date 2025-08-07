@@ -107,17 +107,10 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
     
     # Windows 서브시스템 설정
     if(WIN32)
-        if(SDL2_FOUND)
-            # SDL2가 있으면 Windows 서브시스템 사용 (콘솔 창 숨김)
-            set_target_properties(notgame PROPERTIES
-                LINK_FLAGS "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup"
-            )
-        else()
-            # SDL2가 없으면 콘솔 서브시스템 사용
-            set_target_properties(notgame PROPERTIES
-                LINK_FLAGS "/SUBSYSTEM:CONSOLE"
-            )
-        endif()
+        # 디버깅을 위해 항상 콘솔 서브시스템 사용
+        set_target_properties(notgame PROPERTIES
+            LINK_FLAGS "/SUBSYSTEM:CONSOLE"
+        )
     endif()
 endif()
 

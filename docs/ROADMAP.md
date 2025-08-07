@@ -16,7 +16,7 @@
 5. Grid 시스템 (좌표 매핑) (완료)
 
 ### Step 3: 기본 렌더링 시스템
-1. OpenGL 셰이더 작성 (vertex, fragment)
+1. OpenGL 셰이더 작성 (vertex, fragment) (완료) 
 2. 그리드 렌더링
 3. 게이트 스프라이트 렌더링
 4. 와이어 라인 렌더링

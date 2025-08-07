@@ -11,7 +11,8 @@ GameState::GameState()
     , paused_(false)
     , simulationSpeed_(1.0f)
     , modeData_(nullptr) {
-    circuit_ = std::make_shared<core::Circuit>();
+    // TODO: Initialize circuit when Circuit class is complete
+    // circuit_ = std::make_shared<core::Circuit>();
     uiManager_ = std::make_shared<ui::UIManager>();
 }
 
@@ -34,7 +35,7 @@ void GameState::shutdown() {
     }
     
     if (circuit_) {
-        circuit_->clear();
+        circuit_.reset();
     }
     
     modeData_ = nullptr;
@@ -63,7 +64,8 @@ void GameState::update(float deltaTime) {
     
     // Update circuit simulation
     if (circuit_ && currentMode_ != GameMode::MENU) {
-        circuit_->update(deltaTime * simulationSpeed_);
+        // TODO: Update circuit when Circuit class is complete
+        // circuit_->update(deltaTime * simulationSpeed_);
     }
 }
 
