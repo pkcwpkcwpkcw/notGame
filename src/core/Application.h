@@ -15,6 +15,10 @@ class Circuit;
 class RenderManager;
 class Window;
 
+namespace Input {
+    class InputManager;
+}
+
 enum class AppState {
     INITIALIZING,
     MENU,
@@ -87,6 +91,7 @@ private:
     std::unique_ptr<GridRenderer> m_gridRenderer;
     std::unique_ptr<Camera> m_camera;
     std::unique_ptr<InputHandler> m_inputHandler;
+    std::unique_ptr<Input::InputManager> m_inputManager;
     
     std::unique_ptr<Circuit> m_circuit;
     std::unique_ptr<RenderManager> m_renderManager;

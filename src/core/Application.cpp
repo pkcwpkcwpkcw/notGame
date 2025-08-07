@@ -10,6 +10,7 @@
 #include "../render/Window.h"
 #include "../render/RenderTypes.h"
 #include "../render/Renderer.h"
+#include "../input/InputManager.h"
 #include <imgui.h>
 #include <iostream>
 
@@ -67,6 +68,36 @@ bool Application::initialize(const AppConfig& config) {
     }
     
     m_inputHandler = std::make_unique<InputHandler>(*m_camera, *m_gridRenderer);
+    
+    // Circuit 초기화
+    m_circuit = std::make_unique<Circuit>();
+    
+    // InputManager 초기화
+    m_inputManager = std::make_unique<Input::InputManager>();
+    m_inputManager->initialize(m_camera.get(), m_circuit.get());
+    m_inputManager->setViewport(config.windowWidth, config.windowHeight);
+    
+    // InputManager 이벤트 콜백 설정
+    m_inputManager->setOnClick([this](const Input::ClickEvent& e) {
+        if (m_currentState == AppState::PLAYING) {
+            if (e.hit.type == Input::ClickTarget::Gate) {
+                SDL_Log("Gate clicked: %u", e.hit.objectId);
+                m_inputManager->selectGate(e.hit.objectId);
+            } else if (e.hit.type == Input::ClickTarget::Wire) {
+                SDL_Log("Wire clicked: %u", e.hit.objectId);
+                m_inputManager->selectWire(e.hit.objectId);
+            } else if (e.hit.type == Input::ClickTarget::Empty) {
+                SDL_Log("Empty space clicked at grid: %d, %d", e.gridPos.x, e.gridPos.y);
+            }
+        }
+    });
+    
+    m_inputManager->setOnDragEnd([this](const Input::DragEvent& e) {
+        if (m_currentState == AppState::PLAYING) {
+            SDL_Log("Drag ended: from (%.2f, %.2f) to (%.2f, %.2f)", 
+                e.startWorld.x, e.startWorld.y, e.currentWorld.x, e.currentWorld.y);
+        }
+    });
     
     // 새로운 렌더링 시스템 초기화
     if (!initializeRenderers()) {
@@ -281,9 +312,20 @@ void Application::handleEvents() {
         // Window events always process
         if (event.type == SDL_WINDOWEVENT) {
             shouldProcessEvent = true;
+            
+            // Update InputManager viewport on resize
+            if (event.window.event == SDL_WINDOWEVENT_RESIZED && m_inputManager) {
+                m_inputManager->setViewport(event.window.data1, event.window.data2);
+            }
         }
         
         if (shouldProcessEvent) {
+            // New InputManager handles events
+            if (m_inputManager && !imguiCapturedMouse) {
+                m_inputManager->handleEvent(event);
+            }
+            
+            // Legacy input handler (will be phased out)
             if (m_inputHandler) {
                 m_inputHandler->HandleEvent(event);
             }
@@ -293,6 +335,12 @@ void Application::handleEvents() {
 }
 
 void Application::update(float deltaTime) {
+    // Update new InputManager
+    if (m_inputManager) {
+        m_inputManager->update(deltaTime);
+    }
+    
+    // Update legacy input handler
     if (m_inputHandler) {
         m_inputHandler->Update(deltaTime);
     }
@@ -300,6 +348,22 @@ void Application::update(float deltaTime) {
     m_imguiManager->BeginFrame();
     
     static bool editorInitialized = false;
+    
+    // Debug: Always show state
+    {
+        ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
+        ImGui::Begin("Debug State", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize);
+        const char* stateStr = "Unknown";
+        switch (m_currentState) {
+            case AppState::MENU: stateStr = "MENU"; break;
+            case AppState::PLAYING: stateStr = "PLAYING"; break;
+            case AppState::PAUSED: stateStr = "PAUSED"; break;
+            case AppState::EDITOR: stateStr = "EDITOR"; break;
+        }
+        ImGui::Text("Current State: %s", stateStr);
+        ImGui::Text("Frame: %u", m_frameCount);
+        ImGui::End();
+    }
     
     switch (m_currentState) {
         case AppState::MENU:
@@ -322,11 +386,129 @@ void Application::update(float deltaTime) {
             break;
             
         case AppState::PLAYING:
-            // Set limited grid for stage mode (example: 20x20 grid)
-            if (m_camera && !m_camera->IsGridUnlimited()) {
-                // Grid is already limited
-            } else if (m_camera) {
-                m_camera->SetGridBounds(glm::ivec2(-10, -10), glm::ivec2(9, 9));
+            {
+                // Always show a simple test window first
+                ImGui::Begin("TEST WINDOW - PLAYING MODE");
+                ImGui::Text("This is AppState::PLAYING");
+                ImGui::Text("Frame: %d", m_frameCount);
+                ImGui::End();
+                
+                // Set limited grid for stage mode (example: 20x20 grid)
+                if (m_camera && !m_camera->IsGridUnlimited()) {
+                    // Grid is already limited
+                } else if (m_camera) {
+                    m_camera->SetGridBounds(glm::ivec2(-10, -10), glm::ivec2(9, 9));
+                }
+                
+                // Create test gates for input testing (once)
+                static bool testGatesCreated = false;
+                if (!testGatesCreated && m_circuit) {
+                    SDL_Log("Creating test circuit...");
+                    
+                    // Add a few test gates
+                    auto r1 = m_circuit->addGate(Vec2(0, 0));
+                    auto r2 = m_circuit->addGate(Vec2(3, 0));
+                    auto r3 = m_circuit->addGate(Vec2(6, 0));
+                    
+                    if (r1.isOk()) {
+                        SDL_Log("Gate 1 created with ID: %u", r1.value);
+                    } else {
+                        SDL_Log("Failed to create Gate 1, error: %d", (int)r1.error);
+                    }
+                    
+                    if (r2.isOk()) {
+                        SDL_Log("Gate 2 created with ID: %u", r2.value);
+                    } else {
+                        SDL_Log("Failed to create Gate 2, error: %d", (int)r2.error);
+                    }
+                    
+                    if (r3.isOk()) {
+                        SDL_Log("Gate 3 created with ID: %u", r3.value);
+                    } else {
+                        SDL_Log("Failed to create Gate 3, error: %d", (int)r3.error);
+                    }
+                    
+                    // Add test wires connecting gates if gates were created successfully
+                    if (r1.isOk() && r2.isOk() && r3.isOk()) {
+                        auto w1 = m_circuit->connectGates(r1.value, r2.value, 0);
+                        auto w2 = m_circuit->connectGates(r2.value, r3.value, 0);
+                        
+                        if (w1.isOk()) {
+                            SDL_Log("Wire 1 created with ID: %u", w1.value);
+                        } else {
+                            SDL_Log("Failed to create Wire 1, error: %d", (int)w1.error);
+                        }
+                        
+                        if (w2.isOk()) {
+                            SDL_Log("Wire 2 created with ID: %u", w2.value);
+                        } else {
+                            SDL_Log("Failed to create Wire 2, error: %d", (int)w2.error);
+                        }
+                    }
+                    
+                    testGatesCreated = true;
+                    SDL_Log("Test circuit creation completed. Total gates: %zu, Total wires: %zu", 
+                            m_circuit->getGateCount(), m_circuit->getWireCount());
+                    
+                    // Reset camera to see the gates
+                    if (m_camera) {
+                        m_camera->Reset();
+                        SDL_Log("Camera reset to position (%.2f, %.2f), zoom: %.2f", 
+                                m_camera->GetPosition().x, m_camera->GetPosition().y, m_camera->GetZoom());
+                    }
+                }
+                
+                // Game controls UI
+                ImGui::Begin("Game Controls");
+                
+                // Display circuit status
+                ImGui::Text("Circuit Status:");
+                ImGui::Text("  Gates: %zu", m_circuit ? m_circuit->getGateCount() : 0);
+                ImGui::Text("  Wires: %zu", m_circuit ? m_circuit->getWireCount() : 0);
+                ImGui::Text("  Camera: (%.1f, %.1f) Zoom: %.2f", 
+                    m_camera ? m_camera->GetPosition().x : 0.0f,
+                    m_camera ? m_camera->GetPosition().y : 0.0f,
+                    m_camera ? m_camera->GetZoom() : 1.0f);
+                ImGui::Separator();
+                
+                if (ImGui::Button("Pause (ESC)")) {
+                    setState(AppState::PAUSED);
+                }
+                if (ImGui::Button("Back to Menu")) {
+                    setState(AppState::MENU);
+                }
+                
+                // Manual gate creation button for testing
+                if (ImGui::Button("Add Test Gate")) {
+                    if (m_circuit) {
+                        static float xPos = -3.0f;
+                        auto result = m_circuit->addGate(Vec2(xPos, 2.0f));
+                        if (result.isOk()) {
+                            SDL_Log("Manual gate added at (%.1f, 2.0) with ID: %u", xPos, result.value);
+                            xPos += 2.0f;
+                        }
+                    }
+                }
+                
+                if (ImGui::Button("Reset Camera")) {
+                    if (m_camera) {
+                        m_camera->Reset();
+                    }
+                }
+                
+                // Toggle debug overlay
+                static bool showInputDebug = false;
+                if (ImGui::Checkbox("Show Input Debug", &showInputDebug)) {
+                    if (m_inputManager) {
+                        m_inputManager->setDebugOverlay(showInputDebug);
+                    }
+                }
+                ImGui::End();
+                
+                // Render InputManager debug overlay
+                if (m_inputManager) {
+                    m_inputManager->renderDebugOverlay();
+                }
             }
             break;
             
@@ -391,9 +573,10 @@ void Application::update(float deltaTime) {
 }
 
 void Application::render() {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // Clear only color buffer, not depth (ImGui doesn't use depth buffer)
+    glClear(GL_COLOR_BUFFER_BIT);
     
-    // 새로운 렌더링 시스템 사용
+    // Render the grid and circuit first
     if (m_renderManager && m_circuit && (m_currentState == AppState::PLAYING || m_currentState == AppState::EDITOR)) {
         m_renderManager->BeginFrame();
         m_renderManager->RenderCircuit(*m_circuit);
@@ -402,6 +585,18 @@ void Application::render() {
         m_gridRenderer->Render(*m_camera);
     }
     
+    // Debug: Show circuit state in playing mode
+    if (m_currentState == AppState::PLAYING && m_circuit) {
+        static int frameCounter = 0;
+        if (frameCounter++ % 300 == 0) { // Log every 5 seconds at 60 FPS
+            SDL_Log("Rendering - Gates: %zu, Wires: %zu, RenderManager: %s", 
+                    m_circuit->getGateCount(), 
+                    m_circuit->getWireCount(),
+                    m_renderManager ? "Active" : "Inactive");
+        }
+    }
+    
+    // Render ImGui on top of everything else
     m_imguiManager->EndFrame();
     
     SDL_GL_SwapWindow(m_window);
@@ -477,8 +672,7 @@ bool Application::initializeRenderers() {
         m_renderManager->SetCamera(m_camera.get());
     }
     
-    // Circuit 초기화
-    m_circuit = std::make_unique<Circuit>();
+    // Note: Circuit is already initialized in initialize()
     
     SDL_Log("Render system initialized successfully");
     return true;

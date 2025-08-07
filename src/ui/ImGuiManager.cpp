@@ -34,6 +34,11 @@ bool ImGuiManager::Initialize(SDL_Window* window, SDL_GLContext gl_context) {
 
     ApplyDefaultTheme();
 
+    // Load fonts before initializing backends
+    if (!LoadFonts()) {
+        SDL_Log("Warning: Failed to load custom fonts, using default");
+    }
+    
     if (!ImGui_ImplSDL2_InitForOpenGL(window, gl_context)) {
         std::cerr << "Failed to initialize ImGui SDL2 backend" << std::endl;
         ImGui::DestroyContext(m_context);
@@ -48,10 +53,6 @@ bool ImGuiManager::Initialize(SDL_Window* window, SDL_GLContext gl_context) {
         ImGui::DestroyContext(m_context);
         m_context = nullptr;
         return false;
-    }
-
-    if (!LoadFonts()) {
-        std::cerr << "Warning: Failed to load custom fonts, using default" << std::endl;
     }
 
     m_initialized = true;
@@ -99,8 +100,9 @@ void ImGuiManager::EndFrame() {
 
     ImGui::Render();
     
-    ImGuiIO& io = ImGui::GetIO();
-    glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
+    // Don't override the viewport - let the application manage it
+    // ImGuiIO& io = ImGui::GetIO();
+    // glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
     
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
@@ -134,31 +136,18 @@ bool ImGuiManager::WantCaptureKeyboard() const {
 bool ImGuiManager::LoadFonts() {
     ImGuiIO& io = ImGui::GetIO();
     
+    // Clear any previous font data
+    io.Fonts->Clear();
+    
+    // Just use the default font - don't try to load custom fonts
     io.Fonts->AddFontDefault();
     
-    ImFontConfig config;
-    config.MergeMode = false;
-    config.PixelSnapH = true;
+    SDL_Log("Using default ImGui font");
     
-    static const ImWchar korean_ranges[] = {
-        0x0020, 0x00FF,
-        0x3131, 0x3163,
-        0xAC00, 0xD7A3,
-        0,
-    };
+    // Don't manually build font atlas - let the backend handle it
+    // The OpenGL3 backend will build it automatically when needed
     
-    ImFont* font = io.Fonts->AddFontFromFileTTF(
-        "assets/fonts/NotoSansCJK-Regular.ttc", 
-        16.0f, 
-        &config, 
-        korean_ranges
-    );
-    
-    if (font) {
-        io.FontDefault = font;
-    }
-    
-    return io.Fonts->Build();
+    return true;
 }
 
 void ImGuiManager::ApplyDefaultTheme() {

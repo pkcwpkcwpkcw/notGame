@@ -35,5 +35,5 @@ private:
     
     bool m_initialized = false;
     bool m_showDemo = false;
-    bool m_dockingEnabled = true;
+    bool m_dockingEnabled = false;
 };

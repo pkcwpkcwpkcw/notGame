@@ -106,6 +106,14 @@ void GridRenderer::Shutdown() {
 void GridRenderer::Render(const Camera& camera) {
     if (!m_isGridVisible) return;
     
+    // Save OpenGL state
+    GLint currentProgram;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgram);
+    
+    // Enable blending for grid transparency
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
     glUseProgram(m_shaderProgram);
     
     glm::mat4 viewProj = camera.GetViewProjectionMatrix();
@@ -122,7 +130,12 @@ void GridRenderer::Render(const Camera& camera) {
         RenderHighlights();
     }
     
-    glUseProgram(0);
+    // Restore OpenGL state
+    glUseProgram(currentProgram);
+    
+    // Keep blending enabled for ImGui
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 void GridRenderer::RenderGrid() {
