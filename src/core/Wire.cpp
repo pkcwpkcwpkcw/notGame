@@ -1,80 +1,66 @@
-#include "core/Wire.h"
+#include "Wire.h"
 #include <algorithm>
+#include <limits>
 
-namespace notgame {
-namespace core {
-
-Wire::Wire() 
-    : signal_(false) {
-}
-
-Wire::~Wire() {
-}
-
-void Wire::addSegment(int x, int y) {
-    // Check if segment already exists
-    auto it = std::find_if(segments_.begin(), segments_.end(),
-        [x, y](const WireSegment& seg) {
-            return seg.x == x && seg.y == y;
-        });
+void Wire::calculatePath(const Vec2& fromPos, const Vec2& toPos) noexcept {
+    pathPoints.clear();
+    pathPoints.reserve(4);
     
-    if (it == segments_.end()) {
-        segments_.emplace_back(x, y);
-        updateConnections();
-    }
-}
-
-void Wire::removeSegment(int x, int y) {
-    auto it = std::find_if(segments_.begin(), segments_.end(),
-        [x, y](const WireSegment& seg) {
-            return seg.x == x && seg.y == y;
-        });
+    pathPoints.push_back(fromPos);
     
-    if (it != segments_.end()) {
-        segments_.erase(it);
-        updateConnections();
-    }
-}
-
-void Wire::clear() {
-    segments_.clear();
-    signal_ = false;
-}
-
-void Wire::setSignal(bool value) {
-    signal_ = value;
-}
-
-bool Wire::isConnected(int x, int y) const {
-    return std::any_of(segments_.begin(), segments_.end(),
-        [x, y](const WireSegment& seg) {
-            return seg.x == x && seg.y == y;
-        });
-}
-
-void Wire::updateConnections() {
-    for (auto& segment : segments_) {
-        updateSegmentConnections(segment);
-    }
-}
-
-void Wire::updateSegmentConnections(WireSegment& segment) {
-    segment.connections = WireSegment::NONE;
+    float dx = std::abs(toPos.x - fromPos.x);
+    float dy = std::abs(toPos.y - fromPos.y);
     
-    // Check for adjacent segments
-    if (isConnected(segment.x, segment.y - 1)) {
-        segment.connections |= WireSegment::UP;
-    }
-    if (isConnected(segment.x, segment.y + 1)) {
-        segment.connections |= WireSegment::DOWN;
-    }
-    if (isConnected(segment.x - 1, segment.y)) {
-        segment.connections |= WireSegment::LEFT;
-    }
-    if (isConnected(segment.x + 1, segment.y)) {
-        segment.connections |= WireSegment::RIGHT;
+    if (dx < 0.01f || dy < 0.01f) {
+        pathPoints.push_back(toPos);
+    } else {
+        Vec2 mid1(toPos.x, fromPos.y);
+        pathPoints.push_back(mid1);
+        pathPoints.push_back(toPos);
     }
 }
 
-} // namespace core
-} // namespace notgame
+bool Wire::isPointOnWire(Vec2 point, float tolerance) const noexcept {
+    if (pathPoints.size() < 2) return false;
+    
+    for (size_t i = 0; i < pathPoints.size() - 1; ++i) {
+        const Vec2& p1 = pathPoints[i];
+        const Vec2& p2 = pathPoints[i + 1];
+        
+        Vec2 diff = p2 - p1;
+        float t = std::clamp(
+            (point - p1).dot(diff) / diff.lengthSquared(),
+            0.0f, 1.0f
+        );
+        
+        Vec2 closest = p1 + diff * t;
+        if (closest.distance(point) <= tolerance) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+float Wire::distanceToPoint(Vec2 point) const noexcept {
+    if (pathPoints.empty()) return std::numeric_limits<float>::max();
+    
+    float minDist = std::numeric_limits<float>::max();
+    
+    for (size_t i = 0; i < pathPoints.size() - 1; ++i) {
+        const Vec2& p1 = pathPoints[i];
+        const Vec2& p2 = pathPoints[i + 1];
+        
+        Vec2 diff = p2 - p1;
+        float t = std::clamp(
+            (point - p1).dot(diff) / diff.lengthSquared(),
+            0.0f, 1.0f
+        );
+        
+        Vec2 closest = p1 + diff * t;
+        float dist = closest.distance(point);
+        minDist = std::min(minDist, dist);
+    }
+    
+    return minDist;
+}

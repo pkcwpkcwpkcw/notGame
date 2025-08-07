@@ -1,54 +1,28 @@
 #pragma once
-
+#include "Types.h"
+#include "Vec2.h"
 #include <vector>
-#include <memory>
 
-namespace notgame {
-namespace core {
-
-class Signal;
-
-struct WireSegment {
-    int x, y;
-    enum Direction {
-        NONE = 0,
-        UP = 1,
-        DOWN = 2,
-        LEFT = 4,
-        RIGHT = 8
-    };
-    int connections;  // Bitmask of directions
+struct Wire {
+    WireId id{Constants::INVALID_WIRE_ID};
     
-    WireSegment(int x_, int y_) : x(x_), y(y_), connections(NONE) {}
+    GateId fromGateId{Constants::INVALID_GATE_ID};
+    GateId toGateId{Constants::INVALID_GATE_ID};
+    PortIndex fromPort{Constants::OUTPUT_PORT};
+    PortIndex toPort{Constants::INVALID_PORT};
+    
+    SignalState signalState{SignalState::LOW};
+    
+    std::vector<Vec2> pathPoints;
+    
+    void calculatePath(const Vec2& fromPos, const Vec2& toPos) noexcept;
+    [[nodiscard]] bool isPointOnWire(Vec2 point, float tolerance = 0.1f) const noexcept;
+    [[nodiscard]] float distanceToPoint(Vec2 point) const noexcept;
+    
+    [[nodiscard]] bool isValid() const noexcept {
+        return id != Constants::INVALID_WIRE_ID &&
+               fromGateId != Constants::INVALID_GATE_ID &&
+               toGateId != Constants::INVALID_GATE_ID &&
+               toPort >= 0 && toPort < Constants::MAX_INPUT_PORTS;
+    }
 };
-
-class Wire {
-public:
-    Wire();
-    ~Wire();
-    
-    // Wire construction
-    void addSegment(int x, int y);
-    void removeSegment(int x, int y);
-    void clear();
-    
-    // Signal propagation
-    void setSignal(bool value);
-    bool getSignal() const { return signal_; }
-    
-    // Connectivity
-    bool isConnected(int x, int y) const;
-    void updateConnections();
-    
-    // Getters
-    const std::vector<WireSegment>& getSegments() const { return segments_; }
-    
-private:
-    std::vector<WireSegment> segments_;
-    bool signal_;
-    
-    void updateSegmentConnections(WireSegment& segment);
-};
-
-} // namespace core
-} // namespace notgame

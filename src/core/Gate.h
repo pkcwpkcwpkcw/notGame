@@ -1,48 +1,71 @@
 #pragma once
-
+#include "Types.h"
+#include "Vec2.h"
 #include <array>
-#include <memory>
-#include <cstdint>
+#include <limits>
 
-namespace notgame {
-namespace core {
-
-class Signal;
-
-class Gate {
-public:
-    static constexpr size_t NUM_INPUTS = 3;
-    static constexpr float PROPAGATION_DELAY = 0.1f; // 0.1 second delay
+struct alignas(64) Gate {
+    GateId id{Constants::INVALID_GATE_ID};
+    GateType type{GateType::NOT};
+    uint16_t _padding1{0};
     
-    Gate(int x, int y);
-    ~Gate();
+    Vec2 position{0, 0};
     
-    // Position
-    int getX() const { return x_; }
-    int getY() const { return y_; }
-    void setPosition(int x, int y);
+    std::array<WireId, 3> inputWires{
+        Constants::INVALID_WIRE_ID,
+        Constants::INVALID_WIRE_ID,
+        Constants::INVALID_WIRE_ID
+    };
+    WireId outputWire{Constants::INVALID_WIRE_ID};
     
-    // Input/Output
-    void setInput(size_t index, bool value);
-    bool getOutput() const { return output_; }
+    SignalState currentOutput{SignalState::LOW};
+    SignalState pendingOutput{SignalState::LOW};
+    float delayTimer{0.0f};
+    uint16_t _padding2{0};
     
-    // Update
-    void update(float deltaTime);
+    bool isDirty{false};
+    bool isDelayActive{false};
+    uint8_t _padding3[6]{0};
     
-    // Connection management
-    bool connectInput(size_t index, std::shared_ptr<Signal> signal);
-    void disconnectInput(size_t index);
+    void update(float deltaTime) noexcept;
+    [[nodiscard]] SignalState calculateOutput(
+        const std::array<SignalState, 3>& inputs) const noexcept;
     
-private:
-    int x_, y_;  // Grid position
+    [[nodiscard]] Vec2 getInputPortPosition(PortIndex port) const noexcept;
+    [[nodiscard]] Vec2 getOutputPortPosition() const noexcept;
+    [[nodiscard]] PortIndex getClosestInputPort(Vec2 pos) const noexcept;
+    [[nodiscard]] bool isPointInBounds(Vec2 point) const noexcept;
     
-    std::array<bool, NUM_INPUTS> inputs_;
-    bool output_;
-    bool pendingOutput_;
-    float outputDelay_;
+    [[nodiscard]] bool canConnectInput(PortIndex port) const noexcept {
+        return port >= 0 && port < Constants::MAX_INPUT_PORTS &&
+               inputWires[port] == Constants::INVALID_WIRE_ID;
+    }
     
-    std::array<std::shared_ptr<Signal>, NUM_INPUTS> inputConnections_;
+    [[nodiscard]] bool canConnectOutput() const noexcept {
+        return outputWire == Constants::INVALID_WIRE_ID;
+    }
+    
+    void connectInput(PortIndex port, WireId wire) noexcept {
+        if (port >= 0 && port < Constants::MAX_INPUT_PORTS) {
+            inputWires[port] = wire;
+            isDirty = true;
+        }
+    }
+    
+    void connectOutput(WireId wire) noexcept {
+        outputWire = wire;
+    }
+    
+    void disconnectInput(PortIndex port) noexcept {
+        if (port >= 0 && port < Constants::MAX_INPUT_PORTS) {
+            inputWires[port] = Constants::INVALID_WIRE_ID;
+            isDirty = true;
+        }
+    }
+    
+    void disconnectOutput() noexcept {
+        outputWire = Constants::INVALID_WIRE_ID;
+    }
 };
 
-} // namespace core
-} // namespace notgame
+static_assert(sizeof(Gate) == 64, "Gate should be exactly one cache line");
