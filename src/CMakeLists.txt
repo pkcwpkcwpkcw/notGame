@@ -42,6 +42,7 @@ if(RENDER_SOURCES)
         ${SDL2_INCLUDE_DIRS}
         ${OPENGL_INCLUDE_DIR}
         ${GLAD_INCLUDE_DIR}
+        ${GLM_INCLUDE_DIR}
     )
     target_link_libraries(notgate_render 
         ${SDL2_LIBRARIES}
@@ -169,3 +170,61 @@ else()
     message(STATUS "notgate_utils: No source files (interface library)")
 endif()
 message(STATUS "======================================")
+
+# 테스트 실행 파일 추가
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/TestShaders.cpp")
+    add_executable(test_shaders test/TestShaders.cpp ${GLAD_SOURCE})
+    
+    target_include_directories(test_shaders PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${SDL2_INCLUDE_DIRS}
+        ${OPENGL_INCLUDE_DIR}
+        ${GLAD_INCLUDE_DIR}
+        ${GLM_INCLUDE_DIR}
+    )
+    
+    target_link_libraries(test_shaders PRIVATE
+        notgate_render
+        ${SDL2_LIBRARIES}
+        ${OPENGL_LIBRARIES}
+        ${PLATFORM_LIBS}
+    )
+    
+    # 셰이더 파일 복사
+    add_custom_command(TARGET test_shaders POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/shaders
+        $<TARGET_FILE_DIR:test_shaders>/shaders
+    )
+    
+    message(STATUS "Added test_shaders executable")
+endif()
+
+# 셰이더 컴파일 테스트 실행 파일 추가
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/TestShaderCompile.cpp")
+    add_executable(test_shader_compile test/TestShaderCompile.cpp ${GLAD_SOURCE})
+    
+    target_include_directories(test_shader_compile PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${SDL2_INCLUDE_DIRS}
+        ${OPENGL_INCLUDE_DIR}
+        ${GLAD_INCLUDE_DIR}
+        ${GLM_INCLUDE_DIR}
+    )
+    
+    target_link_libraries(test_shader_compile PRIVATE
+        notgate_render
+        ${SDL2_LIBRARIES}
+        ${OPENGL_LIBRARIES}
+        ${PLATFORM_LIBS}
+    )
+    
+    # 셰이더 파일 복사
+    add_custom_command(TARGET test_shader_compile POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/shaders
+        $<TARGET_FILE_DIR:test_shader_compile>/shaders
+    )
+    
+    message(STATUS "Added test_shader_compile executable")
+endif()
