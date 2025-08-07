@@ -72,18 +72,24 @@ else()
     )
 endif()
 
-if(UI_SOURCES)
-    add_library(notgate_ui STATIC ${UI_SOURCES})
+if(UI_SOURCES OR IMGUI_FOUND)
+    if(UI_SOURCES)
+        add_library(notgate_ui STATIC ${UI_SOURCES} ${IMGUI_SOURCES})
+    else()
+        add_library(notgate_ui STATIC ${IMGUI_SOURCES})
+    endif()
     target_include_directories(notgate_ui PUBLIC 
         ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/extern/imgui
+        ${IMGUI_INCLUDE_DIRS}
+        ${SDL2_INCLUDE_DIRS}
+        ${OPENGL_INCLUDE_DIR}
     )
-    if(TARGET imgui)
-        target_link_libraries(notgate_ui 
-            imgui
-            notgate_render
-        )
-    endif()
+    target_link_libraries(notgate_ui 
+        ${SDL2_LIBRARIES}
+        ${OPENGL_LIBRARIES}
+        notgate_render
+    )
+    target_compile_definitions(notgate_ui PUBLIC IMGUI_IMPL_OPENGL_LOADER_GLAD)
 else()
     add_library(notgate_ui INTERFACE)
     target_include_directories(notgate_ui INTERFACE 

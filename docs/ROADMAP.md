@@ -5,8 +5,29 @@
 ### Step 1: 프로젝트 초기 설정
 1. CMake 프로젝트 구조 생성(완료)
 2. SDL2, OpenGL 기본 윈도우 생성 (완료)
-3. 기본 이벤트 루프 구현
-4. Dear ImGui 통합
+3. 기본 이벤트 루프 구현 (완료)
+4. Dear ImGui 통합 (완료)
+   - **요구사항**:
+     - Dear ImGui 라이브러리를 extern/imgui 서브모듈로 통합
+     - SDL2 + OpenGL3 백엔드 설정
+     - 기본 ImGui 컨텍스트 초기화 및 종료 처리
+     - 프레임별 ImGui 렌더링 파이프라인 구축
+   - **기능 명세**:
+     - ImGui::CreateContext() / DestroyContext() 라이프사이클 관리
+     - ImGui_ImplSDL2_InitForOpenGL() 백엔드 초기화
+     - ImGui_ImplOpenGL3_Init() with GLSL version 330
+     - SDL2 이벤트를 ImGui로 전달 (ImGui_ImplSDL2_ProcessEvent)
+     - 프레임 시작/종료 처리 (NewFrame, Render, RenderDrawData)
+   - **테스트 항목**:
+     - 데모 윈도우 표시 (ImGui::ShowDemoWindow)
+     - 마우스/키보드 입력 정상 처리
+     - 한글 입력 지원 확인 (IME)
+     - 다중 윈도우 렌더링
+     - 도킹(Docking) 기능 활성화
+   - **파일 구조**:
+     - src/ui/ImGuiManager.h/cpp - ImGui 초기화/종료 관리
+     - src/ui/UIContext.h/cpp - UI 상태 및 윈도우 관리
+     - CMakeLists.txt 업데이트 - imgui 소스 파일 추가
 
 ### Step 2: 데이터 구조 정의
 1. Vec2 (위치) 구조체

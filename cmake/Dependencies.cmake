@@ -141,6 +141,7 @@ if(USE_IMGUI)
         endif()
         
         set(IMGUI_INCLUDE_DIRS ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+        set(IMGUI_FOUND TRUE)
     else()
         message(STATUS "Dear ImGui not found. UI will be limited.")
         message(STATUS "To add ImGui:")

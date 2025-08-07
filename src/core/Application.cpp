@@ -1,9 +1,8 @@
 #include "Application.h"
 #include "EventSystem.h"
 #include "Timer.h"
+#include "ui/ImGuiManager.h"
 #include <imgui.h>
-#include <backends/imgui_impl_sdl2.h>
-#include <backends/imgui_impl_opengl3.h>
 #include <iostream>
 
 Application::Application()
@@ -145,25 +144,14 @@ bool Application::initializeGLEW() {
 }
 
 bool Application::initializeImGui() {
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    m_imguiManager = std::make_unique<ImGuiManager>();
     
-    ImGui::StyleColorsDark();
-    
-    if (!ImGui_ImplSDL2_InitForOpenGL(m_window, m_glContext)) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "ImGui_ImplSDL2_InitForOpenGL failed");
+    if (!m_imguiManager->Initialize(m_window, m_glContext)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to initialize ImGuiManager");
         return false;
     }
     
-    const char* glsl_version = "#version 330";
-    if (!ImGui_ImplOpenGL3_Init(glsl_version)) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "ImGui_ImplOpenGL3_Init failed");
-        return false;
-    }
-    
-    SDL_Log("ImGui initialized");
+    SDL_Log("ImGui initialized via ImGuiManager");
     return true;
 }
 
@@ -199,11 +187,10 @@ void Application::handleEvents() {
     SDL_Event event;
     
     while (SDL_PollEvent(&event)) {
-        ImGui_ImplSDL2_ProcessEvent(&event);
+        m_imguiManager->ProcessEvent(event);
         
-        ImGuiIO& io = ImGui::GetIO();
-        bool imguiCapturedMouse = io.WantCaptureMouse;
-        bool imguiCapturedKeyboard = io.WantCaptureKeyboard;
+        bool imguiCapturedMouse = m_imguiManager->WantCaptureMouse();
+        bool imguiCapturedKeyboard = m_imguiManager->WantCaptureKeyboard();
         
         if (event.type == SDL_QUIT) {
             m_running = false;
@@ -249,9 +236,7 @@ void Application::handleEvents() {
 }
 
 void Application::update(float deltaTime) {
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
-    ImGui::NewFrame();
+    m_imguiManager->BeginFrame();
     
     switch (m_currentState) {
         case AppState::MENU:
@@ -262,6 +247,9 @@ void Application::update(float deltaTime) {
             }
             if (ImGui::Button("Editor")) {
                 setState(AppState::EDITOR);
+            }
+            if (ImGui::Button("Show Demo Window")) {
+                m_imguiManager->ShowDemoWindow();
             }
             if (ImGui::Button("Quit")) {
                 m_running = false;
@@ -296,8 +284,7 @@ void Application::update(float deltaTime) {
 void Application::render() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    ImGui::Render();
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    m_imguiManager->EndFrame();
     
     SDL_GL_SwapWindow(m_window);
 }
@@ -327,9 +314,10 @@ void Application::shutdown() {
 }
 
 void Application::cleanupImGui() {
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplSDL2_Shutdown();
-    ImGui::DestroyContext();
+    if (m_imguiManager) {
+        m_imguiManager->Shutdown();
+        m_imguiManager.reset();
+    }
 }
 
 void Application::cleanupGL() {
