@@ -113,16 +113,31 @@ void InputHandler::OnMouseDown(int button, int x, int y) {
         m_panStartPos = mousePos;
         SDL_Log("Panning started");
     } else if (button == SDL_BUTTON_LEFT) {
-        m_isSelecting = true;
-        m_selectionStart = gridPos;
-        
-        if (!m_ctrlPressed) {
-            m_gridRenderer.ClearSelection();
+        // 그리드 경계 체크
+        bool inBounds = true;
+        if (!m_camera.IsGridUnlimited()) {
+            glm::ivec2 minBounds = m_camera.GetMinGridBounds();
+            glm::ivec2 maxBounds = m_camera.GetMaxGridBounds();
+            
+            if (gridPos.x < minBounds.x || gridPos.x > maxBounds.x ||
+                gridPos.y < minBounds.y || gridPos.y > maxBounds.y) {
+                inBounds = false;
+            }
         }
         
-        m_selectedCells.clear();
-        m_selectedCells.push_back(gridPos);
-        m_gridRenderer.SetSelectedCells(m_selectedCells);
+        // 경계 내에 있을 때만 선택 시작
+        if (inBounds) {
+            m_isSelecting = true;
+            m_selectionStart = gridPos;
+            
+            if (!m_ctrlPressed) {
+                m_gridRenderer.ClearSelection();
+            }
+            
+            m_selectedCells.clear();
+            m_selectedCells.push_back(gridPos);
+            m_gridRenderer.SetSelectedCells(m_selectedCells);
+        }
     }
 }
 
@@ -262,6 +277,17 @@ void InputHandler::UpdateSelection(const glm::ivec2& currentCell) {
     int maxX = std::max(m_selectionStart.x, currentCell.x);
     int minY = std::min(m_selectionStart.y, currentCell.y);
     int maxY = std::max(m_selectionStart.y, currentCell.y);
+    
+    // 그리드 경계로 제한
+    if (!m_camera.IsGridUnlimited()) {
+        glm::ivec2 minBounds = m_camera.GetMinGridBounds();
+        glm::ivec2 maxBounds = m_camera.GetMaxGridBounds();
+        
+        minX = std::max(minX, minBounds.x);
+        maxX = std::min(maxX, maxBounds.x);
+        minY = std::max(minY, minBounds.y);
+        maxY = std::min(maxY, maxBounds.y);
+    }
     
     for (int y = minY; y <= maxY; ++y) {
         for (int x = minX; x <= maxX; ++x) {
