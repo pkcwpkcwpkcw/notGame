@@ -1,10 +1,15 @@
 #include "Application.h"
 #include "EventSystem.h"
 #include "Timer.h"
+#include "Circuit.h"
 #include "ui/ImGuiManager.h"
 #include "../render/GridRenderer.h"
 #include "../render/Camera.h"
 #include "../render/InputHandler.h"
+#include "../render/RenderManager.h"
+#include "../render/Window.h"
+#include "../render/RenderTypes.h"
+#include "../render/Renderer.h"
 #include <imgui.h>
 #include <iostream>
 
@@ -63,11 +68,20 @@ bool Application::initialize(const AppConfig& config) {
     
     m_inputHandler = std::make_unique<InputHandler>(*m_camera, *m_gridRenderer);
     
+    // 새로운 렌더링 시스템 초기화
+    if (!initializeRenderers()) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to initialize render system");
+        return false;
+    }
+    
+    // 테스트용 회로 생성 (비활성화)
+    // createDemoCircuit();
+    
     glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    m_currentState = AppState::MENU;
+    m_currentState = AppState::MENU;  // 메뉴 화면으로 시작
     m_running = true;
     
     SDL_Log("Application initialized successfully");
@@ -379,7 +393,12 @@ void Application::update(float deltaTime) {
 void Application::render() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    if (m_gridRenderer && m_camera && (m_currentState == AppState::PLAYING || m_currentState == AppState::EDITOR)) {
+    // 새로운 렌더링 시스템 사용
+    if (m_renderManager && m_circuit && (m_currentState == AppState::PLAYING || m_currentState == AppState::EDITOR)) {
+        m_renderManager->BeginFrame();
+        m_renderManager->RenderCircuit(*m_circuit);
+        m_renderManager->EndFrame();
+    } else if (m_gridRenderer && m_camera && (m_currentState == AppState::PLAYING || m_currentState == AppState::EDITOR)) {
         m_gridRenderer->Render(*m_camera);
     }
     
@@ -425,6 +444,11 @@ void Application::cleanupImGui() {
 }
 
 void Application::cleanupGL() {
+    if (m_renderManager) {
+        m_renderManager->Shutdown();
+        m_renderManager.reset();
+    }
+    
     if (m_gridRenderer) {
         m_gridRenderer->Shutdown();
         m_gridRenderer.reset();
@@ -434,6 +458,72 @@ void Application::cleanupGL() {
         SDL_GL_DeleteContext(m_glContext);
         m_glContext = nullptr;
     }
+}
+
+bool Application::initializeRenderers() {
+    // Window 래퍼 생성
+    m_renderWindow = std::make_unique<Window>();
+    m_renderWindow->SetSDLWindow(m_window);
+    
+    // RenderManager 초기화
+    m_renderManager = std::make_unique<RenderManager>();
+    if (!m_renderManager->Initialize(m_renderWindow.get())) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to initialize RenderManager");
+        return false;
+    }
+    
+    // RenderManager가 Application의 카메라를 사용하도록 설정
+    if (m_camera) {
+        m_renderManager->SetCamera(m_camera.get());
+    }
+    
+    // Circuit 초기화
+    m_circuit = std::make_unique<Circuit>();
+    
+    SDL_Log("Render system initialized successfully");
+    return true;
+}
+
+void Application::createDemoCircuit() {
+    if (!m_circuit) {
+        return;
+    }
+    
+    // 간단한 NOT 게이트 체인 생성
+    // 5개의 NOT 게이트를 일렬로 연결
+    std::vector<GateId> gateIds;
+    
+    for (int i = 0; i < 5; i++) {
+        Vec2 position(i * 3.0f, 0.0f);  // 3칸 간격으로 배치
+        auto result = m_circuit->addGate(position);
+        if (result.isOk()) {
+            gateIds.push_back(result.value);
+        }
+    }
+    
+    // 게이트들을 와이어로 연결
+    for (size_t i = 0; i < gateIds.size() - 1; i++) {
+        m_circuit->connectGates(gateIds[i], gateIds[i + 1], 1);  // 가운데 입력 포트로 연결
+    }
+    
+    // 추가 테스트 회로: 피드백 루프
+    Vec2 pos1(-3.0f, -3.0f);
+    Vec2 pos2(0.0f, -3.0f);
+    Vec2 pos3(3.0f, -3.0f);
+    
+    auto g1 = m_circuit->addGate(pos1);
+    auto g2 = m_circuit->addGate(pos2);
+    auto g3 = m_circuit->addGate(pos3);
+    
+    if (g1.isOk() && g2.isOk() && g3.isOk()) {
+        // 피드백 루프 와이어
+        m_circuit->connectGates(g1.value, g2.value, 0);  // 첫 번째 입력 포트
+        m_circuit->connectGates(g2.value, g3.value, 1);  // 가운데 입력 포트  
+        m_circuit->connectGates(g3.value, g1.value, 2);  // 세 번째 입력 포트
+    }
+    
+    SDL_Log("Demo circuit created with %zu gates and %zu wires", 
+            m_circuit->getGateCount(), m_circuit->getWireCount());
 }
 
 void Application::cleanupSDL() {

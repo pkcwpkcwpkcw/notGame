@@ -23,6 +23,9 @@ public:
     void SetGridVisible(bool visible) { m_isGridVisible = visible; }
     void SetGridOpacity(float opacity) { m_gridOpacity = opacity; }
     void SetCellSize(float size) { m_cellSize = size; }
+    void SetGridSize(float size) { m_cellSize = size; }
+    void SetGridColor(const glm::vec4& color) { /* TODO: implement */ }
+    bool IsVisible() const { return m_isGridVisible; }
     
     void SetHoveredCell(const glm::ivec2& cell);
     void SetSelectedCells(const std::vector<glm::ivec2>& cells);

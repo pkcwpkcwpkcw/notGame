@@ -30,6 +30,11 @@ Window::~Window() {
     }
 }
 
+bool Window::Initialize(const std::string& title, int width, int height, bool fullscreen) {
+    m_fullscreen = fullscreen;
+    return Create(title, width, height);
+}
+
 bool Window::Create(const std::string& title, int width, int height) {
     if (m_initialized) {
         Logger::Warning("Window already created");
@@ -205,3 +210,13 @@ void Window::SetVSync(bool enabled) {
     }
 #endif
 }
+
+#ifdef HAS_SDL2
+void Window::SetSDLWindow(SDL_Window* window) {
+    m_window = window;
+    if (window) {
+        SDL_GetWindowSize(window, &m_width, &m_height);
+        m_initialized = true;
+    }
+}
+#endif

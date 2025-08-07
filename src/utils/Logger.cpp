@@ -19,34 +19,9 @@ std::mutex Logger::s_mutex;
 void Logger::Initialize(const std::string& logFile) {
     // Try-catch to handle any initialization errors
     try {
-        std::lock_guard<std::mutex> lock(s_mutex);
-        
-        if (s_initialized) {
-            return;
-        }
-        
-        if (s_fileOutput && !logFile.empty()) {
-            s_logFile.open(logFile, std::ios::out | std::ios::app);
-            if (!s_logFile.is_open()) {
-                std::cerr << "Failed to open log file: " << logFile << std::endl;
-                s_fileOutput = false;
-            }
-        }
-    
-#ifdef _WIN32
-        // Enable ANSI color codes on Windows console
-        HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-        if (hConsole != INVALID_HANDLE_VALUE) {
-            DWORD mode;
-            if (GetConsoleMode(hConsole, &mode)) {
-                mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-                SetConsoleMode(hConsole, mode);
-            }
-        }
-#endif
-        
-        s_initialized = true;
-        // Don't call Info here to avoid recursion
+        // Internal initialization method that doesn't lock the mutex
+        // This is called from WriteLog which already has the lock
+        InitializeInternal(logFile);
     } catch (const std::exception& e) {
         std::cerr << "Logger initialization exception: " << e.what() << std::endl;
         abort();
@@ -54,6 +29,35 @@ void Logger::Initialize(const std::string& logFile) {
         std::cerr << "Logger initialization unknown exception" << std::endl;
         abort();
     }
+}
+
+void Logger::InitializeInternal(const std::string& logFile) {
+    if (s_initialized) {
+        return;
+    }
+    
+    if (s_fileOutput && !logFile.empty()) {
+        s_logFile.open(logFile, std::ios::out | std::ios::app);
+        if (!s_logFile.is_open()) {
+            std::cerr << "Failed to open log file: " << logFile << std::endl;
+            s_fileOutput = false;
+        }
+    }
+    
+#ifdef _WIN32
+    // Enable ANSI color codes on Windows console
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hConsole != INVALID_HANDLE_VALUE) {
+        DWORD mode;
+        if (GetConsoleMode(hConsole, &mode)) {
+            mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+            SetConsoleMode(hConsole, mode);
+        }
+    }
+#endif
+    
+    s_initialized = true;
+    // Don't call Info here to avoid recursion
 }
 
 void Logger::Shutdown() {

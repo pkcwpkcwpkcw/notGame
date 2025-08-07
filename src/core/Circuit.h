@@ -64,6 +64,11 @@ public:
     auto wiresBegin() noexcept { return wires.begin(); }
     auto wiresEnd() noexcept { return wires.end(); }
     
+    auto gatesBegin() const noexcept { return gates.begin(); }
+    auto gatesEnd() const noexcept { return gates.end(); }
+    auto wiresBegin() const noexcept { return wires.begin(); }
+    auto wiresEnd() const noexcept { return wires.end(); }
+    
 private:
     void propagateSignals() noexcept;
     void updateGateInputs() noexcept;

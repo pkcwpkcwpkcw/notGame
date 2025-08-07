@@ -32,6 +32,7 @@ private:
     static std::string GetTimestamp();
     static std::string GetLevelString(LogLevel level);
     static void WriteLog(LogLevel level, const std::string& message);
+    static void InitializeInternal(const std::string& logFile = "notgate.log");
     
 private:
     static std::ofstream s_logFile;

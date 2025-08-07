@@ -229,3 +229,27 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/TestShaderCompile.cpp")
     
     message(STATUS "Added test_shader_compile executable")
 endif()
+
+# 렌더링 시스템 테스트 실행 파일 추가
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test/TestRenderSystem.cpp")
+    add_executable(test_render_system test/TestRenderSystem.cpp ${GLAD_SOURCE})
+    
+    target_include_directories(test_render_system PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${SDL2_INCLUDE_DIRS}
+        ${OPENGL_INCLUDE_DIR}
+        ${GLAD_INCLUDE_DIR}
+        ${GLM_INCLUDE_DIR}
+    )
+    
+    target_link_libraries(test_render_system PRIVATE
+        notgate_core
+        notgate_render
+        notgate_game
+        ${SDL2_LIBRARIES}
+        ${OPENGL_LIBRARIES}
+        ${PLATFORM_LIBS}
+    )
+    
+    message(STATUS "Added test_render_system executable")
+endif()

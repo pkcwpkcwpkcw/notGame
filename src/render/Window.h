@@ -12,6 +12,7 @@ public:
     Window();
     ~Window();
 
+    bool Initialize(const std::string& title, int width, int height, bool fullscreen = false);
     bool Create(const std::string& title, int width, int height);
     void Destroy();
     void SwapBuffers();
@@ -19,6 +20,7 @@ public:
     
     int GetWidth() const { return m_width; }
     int GetHeight() const { return m_height; }
+    void GetSize(int& width, int& height) const { width = m_width; height = m_height; }
     bool IsFullscreen() const { return m_fullscreen; }
     
     void SetFullscreen(bool fullscreen);
@@ -27,6 +29,7 @@ public:
 #ifdef HAS_SDL2
     SDL_Window* GetSDLWindow() const { return m_window; }
     SDL_GLContext GetGLContext() const { return m_glContext; }
+    void SetSDLWindow(SDL_Window* window);
 #endif
 
 private:

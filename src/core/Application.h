@@ -11,6 +11,9 @@ class ImGuiManager;
 class GridRenderer;
 class Camera;
 class InputHandler;
+class Circuit;
+class RenderManager;
+class Window;
 
 enum class AppState {
     INITIALIZING,
@@ -56,6 +59,8 @@ private:
     bool createGLContext(const AppConfig& config);
     bool initializeGLEW();
     bool initializeImGui();
+    bool initializeRenderers();
+    void createDemoCircuit();
     
     void handleEvents();
     void update(float deltaTime);
@@ -82,6 +87,10 @@ private:
     std::unique_ptr<GridRenderer> m_gridRenderer;
     std::unique_ptr<Camera> m_camera;
     std::unique_ptr<InputHandler> m_inputHandler;
+    
+    std::unique_ptr<Circuit> m_circuit;
+    std::unique_ptr<RenderManager> m_renderManager;
+    std::unique_ptr<Window> m_renderWindow;
     
     uint32_t m_frameCount;
     float m_fpsUpdateTimer;
