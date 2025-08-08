@@ -2,8 +2,10 @@
 
 #include <SDL.h>
 #include <glad/glad.h>
+#include <glm/glm.hpp>
 #include <memory>
 #include <string>
+#include "../core/Vec2.h"
 
 class EventSystem;
 class Timer;
@@ -14,6 +16,10 @@ class InputHandler;
 class Circuit;
 class RenderManager;
 class Window;
+class PlacementManager;
+class SelectionManager;
+class GridMap;
+class GatePaletteUI;
 
 namespace Input {
     class InputManager;
@@ -97,7 +103,17 @@ private:
     std::unique_ptr<RenderManager> m_renderManager;
     std::unique_ptr<Window> m_renderWindow;
     
+    std::unique_ptr<PlacementManager> m_placementManager;
+    std::unique_ptr<SelectionManager> m_selectionManager;
+    std::unique_ptr<GridMap> m_gridMap;
+    std::unique_ptr<GatePaletteUI> m_gatePaletteUI;
+    
     uint32_t m_frameCount;
     float m_fpsUpdateTimer;
     float m_currentFPS;
+    
+    // Context menu state
+    bool m_showContextMenu{false};
+    glm::vec2 m_contextMenuPos{0, 0};
+    Vec2i m_contextMenuGridPos{0, 0};
 };

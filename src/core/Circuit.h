@@ -2,6 +2,8 @@
 #include "Types.h"
 #include "Gate.h"
 #include "Wire.h"
+#include "GatePool.h"
+#include "GridMap.h"
 #include <unordered_map>
 #include <vector>
 #include <memory>

@@ -336,6 +336,11 @@ void GateRenderer::RenderPorts(const Gate& gate, const glm::mat4& mvp) {
 }
 
 glm::vec4 GateRenderer::GetGateColor(const Gate& gate) const {
+    // 선택된 게이트는 노란색 하이라이트
+    if (gate.isSelected) {
+        SDL_Log("[GateRenderer] Rendering selected gate %u with yellow color", gate.id);
+        return glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);  // 노란색
+    }
     // NOT 게이트 본체는 진한 회색
     return glm::vec4(0.4f, 0.4f, 0.4f, 1.0f);
 }
@@ -362,4 +367,102 @@ std::vector<Gate> GateRenderer::FrustumCull(const std::vector<Gate>& gates, cons
     }
     
     return visible;
+}
+
+void GateRenderer::RenderGatePreview(const glm::vec2& position, GateType type, bool isValid, const Camera& camera) {
+    if (!m_gateShader || !m_initialized) {
+        return;
+    }
+    
+    // Enable blending for transparency
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    // Set preview color based on validity
+    glm::vec4 previewColor;
+    if (isValid) {
+        previewColor = glm::vec4(0.0f, 1.0f, 0.0f, 0.4f);  // Green semi-transparent
+    } else {
+        previewColor = glm::vec4(1.0f, 0.0f, 0.0f, 0.4f);  // Red semi-transparent
+    }
+    
+    // Create instance data for preview
+    GateInstance previewInstance;
+    previewInstance.position = position;
+    previewInstance.color = previewColor;
+    previewInstance.rotation = 0.0f;
+    previewInstance.scale = 1.0f;
+    
+    // Update instance buffer with preview data
+    glBindBuffer(GL_ARRAY_BUFFER, m_vboInstance);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(GateInstance), &previewInstance);
+    
+    // Use instanced rendering shader
+    m_gateShader->Use();
+    m_gateShader->SetUniform("uProjection", camera.GetProjectionMatrix());
+    m_gateShader->SetUniform("uView", camera.GetViewMatrix());
+    m_gateShader->SetUniform("uGridSize", m_gateSize);
+    m_gateShader->SetUniform("uBorderColor", glm::vec4(1.0f, 1.0f, 1.0f, 0.8f));  // White border
+    m_gateShader->SetUniform("uBorderWidth", 3.0f);
+    
+    // Draw the preview gate (single instance)
+    glBindVertexArray(m_vaoGate);
+    glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, 1);
+    
+    glBindVertexArray(0);
+    glDisable(GL_BLEND);
+}
+
+void GateRenderer::RenderGateHighlight(const Gate& gate, const Camera& camera) {
+    if (!m_gateShader || !m_initialized) {
+        return;
+    }
+    
+    // Calculate MVP matrix
+    glm::mat4 mvp = camera.GetProjectionMatrix() * camera.GetViewMatrix();
+    
+    // Draw highlight outline
+    glLineWidth(3.0f);
+    
+    float highlightSize = m_gateSize * 1.1f;  // Slightly larger than gate
+    glm::vec2 gatePos(gate.position.x, gate.position.y);
+    
+    float outlineVertices[] = {
+        gatePos.x - highlightSize/2, gatePos.y - highlightSize/2, 0.0f,
+        gatePos.x + highlightSize/2, gatePos.y - highlightSize/2, 0.0f,
+        gatePos.x + highlightSize/2, gatePos.y + highlightSize/2, 0.0f,
+        gatePos.x - highlightSize/2, gatePos.y + highlightSize/2, 0.0f
+    };
+    
+    GLuint outlineVBO, outlineVAO;
+    glGenVertexArrays(1, &outlineVAO);
+    glGenBuffers(1, &outlineVBO);
+    
+    glBindVertexArray(outlineVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, outlineVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(outlineVertices), outlineVertices, GL_STATIC_DRAW);
+    
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    
+    m_portShader->Use();
+    m_portShader->SetUniform("uMVP", mvp);
+    m_portShader->SetUniform("uOffset", glm::vec2(0.0f, 0.0f));
+    
+    // Yellow highlight for selected gates
+    if (gate.isSelected) {
+        m_portShader->SetUniform("uColor", glm::vec4(1.0f, 1.0f, 0.0f, 1.0f));
+    }
+    // Light blue for hovered gates  
+    else if (gate.isHovered) {
+        m_portShader->SetUniform("uColor", glm::vec4(0.5f, 0.8f, 1.0f, 1.0f));
+    }
+    
+    glDrawArrays(GL_LINE_LOOP, 0, 4);
+    
+    glDeleteVertexArrays(1, &outlineVAO);
+    glDeleteBuffers(1, &outlineVBO);
+    glLineWidth(1.0f);
+    
+    glBindVertexArray(0);
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include <cmath>
 #include <algorithm>
+#include <cstdint>
 
 struct alignas(8) Vec2 {
     float x, y;
@@ -72,3 +73,24 @@ struct alignas(8) Vec2 {
 inline Vec2 operator*(float s, const Vec2& v) noexcept {
     return v * s;
 }
+
+struct Vec2i {
+    int32_t x, y;
+    
+    constexpr Vec2i() noexcept : x(0), y(0) {}
+    constexpr Vec2i(int32_t x_, int32_t y_) noexcept : x(x_), y(y_) {}
+    
+    Vec2i operator+(const Vec2i& v) const noexcept { 
+        return Vec2i(x + v.x, y + v.y); 
+    }
+    Vec2i operator-(const Vec2i& v) const noexcept { 
+        return Vec2i(x - v.x, y - v.y); 
+    }
+    
+    bool operator==(const Vec2i& v) const noexcept {
+        return x == v.x && y == v.y;
+    }
+    bool operator!=(const Vec2i& v) const noexcept {
+        return !(*this == v);
+    }
+};

@@ -24,6 +24,7 @@ public:
     
     void RenderCircuit(const Circuit& circuit);
     void RenderDraggingWire(const glm::vec2& start, const glm::vec2& end);
+    void RenderGatePreview(const glm::vec2& position, GateType type, bool isValid);
     
     void SetGridSize(float size);
     void SetGridColor(const glm::vec4& color);

@@ -41,12 +41,11 @@ if(USE_SDL2)
             set(SDL2_SEARCH_PATHS
                 "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows"
                 "${CMAKE_BINARY_DIR}/vcpkg_installed/x86-windows"
+                "${CMAKE_SOURCE_DIR}/build/vcpkg_installed/x64-windows"
                 "C:/SDL2"
                 "C:/Libraries/SDL2"
                 "${CMAKE_SOURCE_DIR}/extern/SDL2"
                 "$ENV{PROGRAMFILES}/SDL2"
-                "C:/msys64/ucrt64"
-                "C:/msys64/mingw64"
             )
             
             find_path(SDL2_INCLUDE_DIR 

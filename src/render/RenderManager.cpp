@@ -112,9 +112,9 @@ void RenderManager::RenderCircuit(const Circuit& circuit) {
     std::vector<Gate> gates;
     std::vector<RenderWire> renderWires;
     
-    // 게이트 수집
+    // 게이트 수집 - Copy the gates to preserve selection state
     for (auto it = circuit.gatesBegin(); it != circuit.gatesEnd(); ++it) {
-        gates.push_back(it->second);
+        gates.push_back(it->second);  // This copies the gate including isSelected state
     }
     
     // 게이트 수집 완료
@@ -164,6 +164,15 @@ void RenderManager::RenderDraggingWire(const glm::vec2& start, const glm::vec2& 
     
     Camera& camera = m_externalCamera ? *m_externalCamera : *m_camera;
     m_wireRenderer->RenderDraggingWire(start, end, camera);
+}
+
+void RenderManager::RenderGatePreview(const glm::vec2& position, GateType type, bool isValid) {
+    if (!m_initialized || !m_gateRenderer) {
+        return;
+    }
+    
+    Camera& camera = m_externalCamera ? *m_externalCamera : *m_camera;
+    m_gateRenderer->RenderGatePreview(position, type, isValid, camera);
 }
 
 void RenderManager::SetGridSize(float size) {

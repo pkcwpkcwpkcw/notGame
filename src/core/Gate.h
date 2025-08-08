@@ -25,7 +25,9 @@ struct alignas(64) Gate {
     
     bool isDirty{false};
     bool isDelayActive{false};
-    uint8_t _padding3[6]{0};
+    bool isSelected{false};
+    bool isHovered{false};
+    uint8_t _padding3[4]{0};
     
     void update(float deltaTime) noexcept;
     [[nodiscard]] SignalState calculateOutput(

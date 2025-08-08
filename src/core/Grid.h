@@ -2,6 +2,7 @@
 #include "Vec2.h"
 #include "Types.h"
 #include <algorithm>
+#include <cmath>
 
 class Grid {
 private:
@@ -34,8 +35,8 @@ public:
     
     [[nodiscard]] Vec2 snapToGrid(Vec2 pos) const noexcept {
         return Vec2(
-            std::round(pos.x),
-            std::round(pos.y)
+            std::floor(pos.x),
+            std::floor(pos.y)
         );
     }
     

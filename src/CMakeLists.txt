@@ -21,7 +21,6 @@ if(CORE_SOURCES)
     )
     target_link_libraries(notgate_core
         ${SDL2_LIBRARIES}
-        ${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows/lib/SDL2.lib
         notgate_utils
     )
     if(TARGET imgui)

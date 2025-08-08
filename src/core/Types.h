@@ -39,7 +39,54 @@ enum class ErrorCode : int32_t {
     PORT_ALREADY_CONNECTED = -3,
     CIRCULAR_DEPENDENCY = -4,
     OUT_OF_BOUNDS = -5,
-    OUT_OF_MEMORY = -6
+    OUT_OF_MEMORY = -6,
+    NOT_INITIALIZED = -7,
+    INVALID_POSITION = -8
+};
+
+enum class MouseButton : uint8_t {
+    Left = 0,
+    Middle = 1,
+    Right = 2
+};
+
+enum class Key : uint16_t {
+    Unknown = 0,
+    A = 'A',
+    B = 'B',
+    C = 'C',
+    D = 'D',
+    E = 'E',
+    F = 'F',
+    G = 'G',
+    H = 'H',
+    I = 'I',
+    J = 'J',
+    K = 'K',
+    L = 'L',
+    M = 'M',
+    N = 'N',
+    O = 'O',
+    P = 'P',
+    Q = 'Q',
+    R = 'R',
+    S = 'S',
+    T = 'T',
+    U = 'U',
+    V = 'V',
+    W = 'W',
+    X = 'X',
+    Y = 'Y',
+    Z = 'Z',
+    Delete = 127,
+    Backspace = 8,
+    Escape = 27,
+    LeftShift = 256,
+    RightShift = 257,
+    LeftCtrl = 258,
+    RightCtrl = 259,
+    LeftAlt = 260,
+    RightAlt = 261
 };
 
 template<typename T>
@@ -47,6 +94,13 @@ struct Result {
     T value;
     ErrorCode error;
     
+    Result() : value{}, error(ErrorCode::SUCCESS) {}
+    Result(T val) : value(val), error(ErrorCode::SUCCESS) {}
+    Result(T val, ErrorCode err) : value(val), error(err) {}
+    
+    [[nodiscard]] bool success() const noexcept { 
+        return error == ErrorCode::SUCCESS; 
+    }
     [[nodiscard]] bool isOk() const noexcept { 
         return error == ErrorCode::SUCCESS; 
     }

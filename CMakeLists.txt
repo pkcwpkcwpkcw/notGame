@@ -59,6 +59,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
     # SDL2가 있으면 포함
     if(SDL2_FOUND)
         target_include_directories(notgame PRIVATE ${SDL2_INCLUDE_DIRS})
+        # Use the SDL2_LIBRARIES variable directly
         target_link_libraries(notgame PRIVATE ${SDL2_LIBRARIES})
     endif()
     

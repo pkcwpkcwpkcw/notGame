@@ -18,6 +18,8 @@ public:
     
     void BeginFrame();
     void RenderGates(const std::vector<Gate>& gates, const Camera& camera);
+    void RenderGatePreview(const glm::vec2& position, GateType type, bool isValid, const Camera& camera);
+    void RenderGateHighlight(const Gate& gate, const Camera& camera);
     void EndFrame();
     
     void SetGateSize(float size) { m_gateSize = size; }

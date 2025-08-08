@@ -2,7 +2,12 @@
 #include "EventSystem.h"
 #include "Timer.h"
 #include "Circuit.h"
+#include "Grid.h"
+#include "GridMap.h"
 #include "ui/ImGuiManager.h"
+#include "../ui/GatePaletteUI.h"
+#include "../game/PlacementManager.h"
+#include "../game/SelectionManager.h"
 #include "../render/GridRenderer.h"
 #include "../render/Camera.h"
 #include "../render/InputHandler.h"
@@ -71,6 +76,21 @@ bool Application::initialize(const AppConfig& config) {
     
     // Circuit 초기화
     m_circuit = std::make_unique<Circuit>();
+    
+    // Gate Placement System 초기화
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Initializing Gate Placement System...");
+    m_gridMap = std::make_unique<GridMap>();
+    m_placementManager = std::make_unique<PlacementManager>();
+    m_selectionManager = std::make_unique<SelectionManager>();
+    m_gatePaletteUI = std::make_unique<GatePaletteUI>();
+    
+    // Grid 시스템 생성 및 연결
+    Grid* gridSystem = new Grid();
+    m_placementManager->initialize(m_circuit.get(), m_gridMap.get(), gridSystem);
+    m_selectionManager->initialize(m_circuit.get(), m_gridMap.get(), gridSystem);
+    m_gatePaletteUI->initialize(m_placementManager.get(), m_selectionManager.get());
+    
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Gate Placement System initialized successfully");
     
     // InputManager 초기화
     m_inputManager = std::make_unique<Input::InputManager>();
@@ -250,6 +270,15 @@ void Application::handleEvents() {
         bool imguiCapturedMouse = m_imguiManager->WantCaptureMouse();
         bool imguiCapturedKeyboard = m_imguiManager->WantCaptureKeyboard();
         
+        // Debug: Log ImGui capture state when in placement mode
+        static bool lastPlacementMode = false;
+        bool currentPlacementMode = m_placementManager && m_placementManager->isInPlacementMode();
+        if (currentPlacementMode && !lastPlacementMode) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Entered placement mode - ImGui keyboard capture: %s", 
+                       imguiCapturedKeyboard ? "YES" : "NO");
+        }
+        lastPlacementMode = currentPlacementMode;
+        
         if (event.type == SDL_QUIT) {
             m_running = false;
             return;
@@ -270,13 +299,63 @@ void Application::handleEvents() {
             }
         }
         
-        if (!imguiCapturedKeyboard && event.type == SDL_KEYDOWN) {
+        // Debug: Log all keyboard events in placement mode
+        if (event.type == SDL_KEYDOWN && m_placementManager && m_placementManager->isInPlacementMode()) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Key down in placement mode - key: %s, ImGui captured: %s", 
+                       SDL_GetKeyName(event.key.keysym.sym), imguiCapturedKeyboard ? "YES" : "NO");
+        }
+        
+        // Handle keyboard events - in placement mode, bypass ImGui capture for certain keys
+        bool isInPlacementMode = m_placementManager && m_placementManager->isInPlacementMode();
+        bool shouldHandleKey = !imguiCapturedKeyboard || 
+                               (isInPlacementMode && (event.key.keysym.sym == SDLK_ESCAPE || 
+                                                      event.key.keysym.sym == SDLK_LSHIFT || 
+                                                      event.key.keysym.sym == SDLK_RSHIFT));
+        
+        if (shouldHandleKey && event.type == SDL_KEYDOWN) {
             switch (event.key.keysym.sym) {
                 case SDLK_ESCAPE:
-                    if (m_currentState == AppState::PLAYING) {
-                        setState(AppState::PAUSED);
-                    } else if (m_currentState == AppState::PAUSED) {
-                        setState(AppState::PLAYING);
+                    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "ESC key pressed");
+                    if (m_placementManager) {
+                        bool inPlacementMode = m_placementManager->isInPlacementMode();
+                        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "PlacementManager mode check: %s", inPlacementMode ? "IN PLACEMENT MODE" : "NOT IN PLACEMENT MODE");
+                        if (inPlacementMode) {
+                            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Calling exitPlacementMode()");
+                            m_placementManager->exitPlacementMode();
+                        } else if (m_selectionManager && m_selectionManager->hasSelection()) {
+                            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Clearing selection");
+                            m_selectionManager->clearSelection();
+                        } else if (m_currentState == AppState::PLAYING) {
+                            setState(AppState::PAUSED);
+                        } else if (m_currentState == AppState::PAUSED) {
+                            setState(AppState::PLAYING);
+                        }
+                    }
+                    break;
+                    
+                case SDLK_n:
+                    if (m_placementManager && m_currentState == AppState::PLAYING) {
+                        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "N key pressed - entering placement mode");
+                        m_placementManager->enterPlacementMode(GateType::NOT);
+                    }
+                    break;
+                    
+                case SDLK_LSHIFT:
+                case SDLK_RSHIFT:
+                    if (m_placementManager && m_currentState == AppState::PLAYING && !event.key.repeat) {
+                        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Shift key pressed - enabling continuous placement");
+                        m_placementManager->onKeyPress(Key::LeftShift);
+                    }
+                    break;
+                    
+                case SDLK_DELETE:
+                case SDLK_BACKSPACE:
+                    if (m_selectionManager && m_currentState == AppState::PLAYING) {
+                        if (m_selectionManager->hasSelection()) {
+                            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Deleting %zu selected gates", 
+                                       m_selectionManager->getSelectionCount());
+                            m_selectionManager->deleteSelected();
+                        }
                     }
                     break;
                     
@@ -304,9 +383,25 @@ void Application::handleEvents() {
             shouldProcessEvent = true;
         }
         
-        // Keyboard events - only process if ImGui doesn't want keyboard
-        if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && !imguiCapturedKeyboard) {
+        // Keyboard events - only process if ImGui doesn't want keyboard OR if in placement mode for specific keys
+        bool isInPlacementModeKeyRelease = m_placementManager && m_placementManager->isInPlacementMode() && 
+                                          event.type == SDL_KEYUP && (event.key.keysym.sym == SDLK_LSHIFT || 
+                                                                      event.key.keysym.sym == SDLK_RSHIFT);
+        
+        if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && 
+            (!imguiCapturedKeyboard || isInPlacementModeKeyRelease)) {
             shouldProcessEvent = true;
+            
+            // Handle key release events for placement manager
+            if (event.type == SDL_KEYUP && m_placementManager && m_currentState == AppState::PLAYING) {
+                switch (event.key.keysym.sym) {
+                    case SDLK_LSHIFT:
+                    case SDLK_RSHIFT:
+                        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Shift key released - disabling continuous placement");
+                        m_placementManager->onKeyRelease(Key::LeftShift);
+                        break;
+                }
+            }
         }
         
         // Window events always process
@@ -320,6 +415,66 @@ void Application::handleEvents() {
         }
         
         if (shouldProcessEvent) {
+            // Handle placement and selection mouse events
+            if (m_currentState == AppState::PLAYING && !imguiCapturedMouse) {
+                if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+                    if (m_placementManager && m_placementManager->isInPlacementMode()) {
+                        // Placement mode takes priority
+                        if (m_camera) {
+                            glm::vec2 screenPos(static_cast<float>(event.button.x), static_cast<float>(event.button.y));
+                            glm::vec2 worldPos = m_camera->ScreenToWorld(screenPos);
+                            Vec2 pos(worldPos.x, worldPos.y);
+                            m_placementManager->onMouseClick(MouseButton::Left, pos);
+                        }
+                    } else if (m_selectionManager && m_camera) {
+                        // Selection mode when not placing
+                        glm::vec2 screenPos(static_cast<float>(event.button.x), static_cast<float>(event.button.y));
+                        glm::vec2 worldPos = m_camera->ScreenToWorld(screenPos);
+                        Vec2 pos(worldPos.x, worldPos.y);
+                        
+                        // Check for modifier keys
+                        const Uint8* keystate = SDL_GetKeyboardState(NULL);
+                        bool ctrlHeld = keystate[SDL_SCANCODE_LCTRL] || keystate[SDL_SCANCODE_RCTRL];
+                        bool shiftHeld = keystate[SDL_SCANCODE_LSHIFT] || keystate[SDL_SCANCODE_RSHIFT];
+                        
+                        m_selectionManager->onMouseClick(MouseButton::Left, pos, ctrlHeld, shiftHeld);
+                    }
+                } else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT) {
+                    if (m_placementManager && m_placementManager->isInPlacementMode()) {
+                        // Right click cancels placement mode
+                        m_placementManager->exitPlacementMode();
+                    } else if (m_selectionManager && m_camera) {
+                        // Right click for context menu
+                        glm::vec2 screenPos(static_cast<float>(event.button.x), static_cast<float>(event.button.y));
+                        glm::vec2 worldPos = m_camera->ScreenToWorld(screenPos);
+                        Grid* gridSystem = new Grid();
+                        Vec2 snapped = gridSystem->snapToGrid(Vec2(worldPos.x, worldPos.y));
+                        Vec2i gridPos(static_cast<int>(snapped.x), static_cast<int>(snapped.y));
+                        
+                        // Store context menu position for rendering
+                        m_contextMenuPos = glm::vec2(event.button.x, event.button.y);
+                        m_contextMenuGridPos = gridPos;
+                        m_showContextMenu = true;
+                        
+                        // Select gate if clicking on one
+                        GateId gateId = m_selectionManager->getGateAt(gridPos);
+                        if (gateId != Constants::INVALID_GATE_ID) {
+                            if (!m_selectionManager->isSelected(gateId)) {
+                                m_selectionManager->clearSelection();
+                                m_selectionManager->selectGate(gateId);
+                            }
+                        }
+                    }
+                } else if (event.type == SDL_MOUSEMOTION) {
+                    if (m_placementManager && m_camera) {
+                        glm::vec2 screenPos(static_cast<float>(event.motion.x), static_cast<float>(event.motion.y));
+                        glm::vec2 worldPos = m_camera->ScreenToWorld(screenPos);
+                        Vec2 pos(worldPos.x, worldPos.y);
+                        m_placementManager->onMouseMove(pos);
+                    }
+                }
+            }
+            
             // New InputManager handles events
             if (m_inputManager && !imguiCapturedMouse) {
                 m_inputManager->handleEvent(event);
@@ -352,7 +507,7 @@ void Application::update(float deltaTime) {
     // Debug: Always show state
     {
         ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
-        ImGui::Begin("Debug State", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::Begin("Debug State", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav);
         const char* stateStr = "Unknown";
         switch (m_currentState) {
             case AppState::MENU: stateStr = "MENU"; break;
@@ -388,7 +543,7 @@ void Application::update(float deltaTime) {
         case AppState::PLAYING:
             {
                 // Always show a simple test window first
-                ImGui::Begin("TEST WINDOW - PLAYING MODE");
+                ImGui::Begin("TEST WINDOW - PLAYING MODE", nullptr, ImGuiWindowFlags_NoFocusOnAppearing);
                 ImGui::Text("This is AppState::PLAYING");
                 ImGui::Text("Frame: %d", m_frameCount);
                 ImGui::End();
@@ -458,8 +613,13 @@ void Application::update(float deltaTime) {
                     }
                 }
                 
+                // Render Gate Palette UI
+                if (m_gatePaletteUI) {
+                    m_gatePaletteUI->render();
+                }
+                
                 // Game controls UI
-                ImGui::Begin("Game Controls");
+                ImGui::Begin("Game Controls", nullptr, ImGuiWindowFlags_NoFocusOnAppearing);
                 
                 // Display circuit status
                 ImGui::Text("Circuit Status:");
@@ -508,6 +668,54 @@ void Application::update(float deltaTime) {
                 // Render InputManager debug overlay
                 if (m_inputManager) {
                     m_inputManager->renderDebugOverlay();
+                }
+                
+                // Render context menu
+                if (m_showContextMenu) {
+                    ImGui::SetNextWindowPos(ImVec2(m_contextMenuPos.x, m_contextMenuPos.y));
+                    if (ImGui::BeginPopupContextItem("##ContextMenu", ImGuiPopupFlags_NoOpenOverExistingPopup | ImGuiPopupFlags_MouseButtonRight)) {
+                        bool hasGate = false;
+                        if (m_selectionManager) {
+                            GateId gateId = m_selectionManager->getGateAt(m_contextMenuGridPos);
+                            hasGate = (gateId != Constants::INVALID_GATE_ID);
+                        }
+                        
+                        if (hasGate) {
+                            if (ImGui::MenuItem("Delete Gate", "Delete")) {
+                                if (m_selectionManager && m_selectionManager->hasSelection()) {
+                                    m_selectionManager->deleteSelected();
+                                }
+                            }
+                            ImGui::Separator();
+                        }
+                        
+                        if (ImGui::MenuItem("Place NOT Gate", "N")) {
+                            if (m_placementManager) {
+                                m_placementManager->enterPlacementMode(GateType::NOT);
+                            }
+                        }
+                        
+                        if (hasGate) {
+                            ImGui::Separator();
+                            if (ImGui::MenuItem("Select All", "Ctrl+A")) {
+                                // TODO: Implement select all
+                            }
+                            if (ImGui::MenuItem("Clear Selection", "Esc")) {
+                                if (m_selectionManager) {
+                                    m_selectionManager->clearSelection();
+                                }
+                            }
+                        }
+                        
+                        ImGui::EndPopup();
+                    } else {
+                        m_showContextMenu = false;
+                    }
+                    
+                    // Open popup on first frame
+                    if (m_showContextMenu) {
+                        ImGui::OpenPopup("##ContextMenu");
+                    }
                 }
             }
             break;
@@ -581,20 +789,27 @@ void Application::render() {
         m_renderManager->BeginFrame();
         m_renderManager->RenderCircuit(*m_circuit);
         m_renderManager->EndFrame();
+        
+        // Render gate preview AFTER everything else (on top)
+        if (m_placementManager && m_placementManager->isInPlacementMode()) {
+            // Disable depth testing to ensure preview is always on top
+            glDisable(GL_DEPTH_TEST);
+            glDepthMask(GL_FALSE);
+            
+            Vec2i previewPos = m_placementManager->getPreviewPosition();
+            bool isValid = m_placementManager->isPreviewPositionValid();
+            glm::vec2 worldPos(static_cast<float>(previewPos.x), static_cast<float>(previewPos.y));
+            m_renderManager->RenderGatePreview(worldPos, GateType::NOT, isValid);
+            
+            // Re-enable depth testing
+            glEnable(GL_DEPTH_TEST);
+            glDepthMask(GL_TRUE);
+        }
     } else if (m_gridRenderer && m_camera && (m_currentState == AppState::PLAYING || m_currentState == AppState::EDITOR)) {
         m_gridRenderer->Render(*m_camera);
     }
     
-    // Debug: Show circuit state in playing mode
-    if (m_currentState == AppState::PLAYING && m_circuit) {
-        static int frameCounter = 0;
-        if (frameCounter++ % 300 == 0) { // Log every 5 seconds at 60 FPS
-            SDL_Log("Rendering - Gates: %zu, Wires: %zu, RenderManager: %s", 
-                    m_circuit->getGateCount(), 
-                    m_circuit->getWireCount(),
-                    m_renderManager ? "Active" : "Inactive");
-        }
-    }
+    // Removed repetitive rendering logs
     
     // Render ImGui on top of everything else
     m_imguiManager->EndFrame();

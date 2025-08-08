@@ -259,32 +259,13 @@ void GridRenderer::UpdateGridBuffer(const Camera& camera) {
         glm::ivec2 minBounds = camera.GetMinGridBounds();
         glm::ivec2 maxBounds = camera.GetMaxGridBounds();
         
-        // Debug log BEFORE applying bounds
-        static int frameCounter = 0;
-        if (frameCounter++ % 60 == 0) {
-            SDL_Log("BEFORE: Grid bounds: min(%d,%d) max(%d,%d), Visible: (%d,%d) to (%d,%d)", 
-                    minBounds.x, minBounds.y, maxBounds.x, maxBounds.y,
-                    startX, startY, endX, endY);
-        }
-        
+        // Apply bounds without logging
         startX = std::max(startX, minBounds.x);
         endX = std::min(endX, maxBounds.x + 1);  // +1 for drawing the last line
         startY = std::max(startY, minBounds.y);
         endY = std::min(endY, maxBounds.y + 1);  // +1 for drawing the last line
-        
-        // Debug log AFTER applying bounds
-        if ((frameCounter-1) % 60 == 0) {
-            SDL_Log("AFTER: Actually drawing from (%d,%d) to (%d,%d)", 
-                    startX, startY, endX, endY);
-            SDL_Log("IsGridUnlimited = %s", camera.IsGridUnlimited() ? "true" : "false");
-        }
     } else {
         // Default limits for unlimited grid (can still be very large)
-        static int unlimitedLogCounter = 0;
-        if (unlimitedLogCounter++ % 60 == 0) {
-            SDL_Log("WARNING: Grid is UNLIMITED! Drawing from (%d,%d) to (%d,%d)", 
-                    startX, startY, endX, endY);
-        }
         startX = std::max(startX, -1000);
         endX = std::min(endX, 1000);
         startY = std::max(startY, -1000);

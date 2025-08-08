@@ -2,6 +2,8 @@
 
 # SDL2 library paths - vcpkg를 우선으로 검색
 set(SDL2_SEARCH_PATHS
+    "C:/vcpkg/packages/sdl2_x64-windows"
+    "C:/vcpkg/installed/x64-windows"
     "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows"
     "${CMAKE_BINARY_DIR}/vcpkg_installed/x86-windows"
     "C:/msys64/ucrt64"
@@ -20,13 +22,15 @@ find_library(SDL2_LIBRARY
     NAMES SDL2 libSDL2 SDL2.dll
     PATH_SUFFIXES lib bin
     PATHS ${SDL2_SEARCH_PATHS}
+    NO_DEFAULT_PATH
 )
 
 # Find SDL2main library
 find_library(SDL2MAIN_LIBRARY
     NAMES SDL2main libSDL2main
-    PATH_SUFFIXES lib
+    PATH_SUFFIXES lib lib/manual-link
     PATHS ${SDL2_SEARCH_PATHS}
+    NO_DEFAULT_PATH
 )
 
 # Set SDL2 variables
