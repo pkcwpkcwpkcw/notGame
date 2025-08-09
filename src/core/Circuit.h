@@ -40,6 +40,8 @@ public:
     
     [[nodiscard]] Result<WireId> connectGates(
         GateId fromId, GateId toId, PortIndex toPort) noexcept;
+    ErrorCode addWire(const Wire& wire) noexcept;
+    [[nodiscard]] WireId getNextWireId() noexcept { return nextWireId++; }
     ErrorCode removeWire(WireId id) noexcept;
     [[nodiscard]] Wire* getWire(WireId id) noexcept;
     [[nodiscard]] const Wire* getWire(WireId id) const noexcept;

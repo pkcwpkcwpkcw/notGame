@@ -2,6 +2,7 @@
 #include "../core/Circuit.h"
 #include "../core/GridMap.h"
 #include "../core/Grid.h"
+#include "../core/CellWireManager.h"
 #include <SDL.h>
 
 void PlacementManager::enterPlacementMode(GateType type) noexcept {
@@ -55,6 +56,13 @@ Result<GateId> PlacementManager::placeGate(Vec2i gridPos) noexcept {
     }
     
     Vec2 worldPos = Vec2(static_cast<float>(gridPos.x), static_cast<float>(gridPos.y));
+    
+    // 게이트 설치 전에 해당 위치의 와이어 제거
+    if (cellWireManager) {
+        glm::ivec2 glmGridPos(gridPos.x, gridPos.y);
+        cellWireManager->removeWireAt(glmGridPos);
+        SDL_Log("[PlacementManager] Removed wire at (%d, %d) before placing gate", gridPos.x, gridPos.y);
+    }
     
     auto result = circuit->addGate(worldPos);
     

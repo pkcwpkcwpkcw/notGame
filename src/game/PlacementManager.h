@@ -6,6 +6,7 @@
 class Circuit;
 class GridMap;
 class Grid;
+class CellWireManager;
 
 class PlacementManager {
 public:
@@ -25,6 +26,7 @@ private:
     Circuit* circuit{nullptr};
     GridMap* gridMap{nullptr};
     Grid* grid{nullptr};
+    CellWireManager* cellWireManager{nullptr};
     
     std::vector<Vec2i> recentPlacements;
     
@@ -32,10 +34,11 @@ public:
     PlacementManager() = default;
     ~PlacementManager() = default;
     
-    void initialize(Circuit* circ, GridMap* gMap, Grid* g) noexcept {
+    void initialize(Circuit* circ, GridMap* gMap, Grid* g, CellWireManager* cwm = nullptr) noexcept {
         circuit = circ;
         gridMap = gMap;
         grid = g;
+        cellWireManager = cwm;
     }
     
     void enterPlacementMode(GateType type) noexcept;

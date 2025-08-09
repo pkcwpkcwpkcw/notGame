@@ -84,6 +84,22 @@ Result<WireId> Circuit::connectGates(
     return {wire.id, ErrorCode::SUCCESS};
 }
 
+ErrorCode Circuit::addWire(const Wire& wire) noexcept {
+    // Add wire directly without gate validation (for cell-to-cell wires)
+    wires[wire.id] = wire;
+    
+    // If connected to gates, update their connections
+    if (wire.toGateId != Constants::INVALID_GATE_ID) {
+        if (auto* toGate = getGate(wire.toGateId)) {
+            toGate->inputWires[wire.toPort] = wire.id;
+            markGateDirty(wire.toGateId);
+        }
+    }
+    
+    updateTopologicalOrder();
+    return ErrorCode::SUCCESS;
+}
+
 ErrorCode Circuit::removeWire(WireId id) noexcept {
     auto it = wires.find(id);
     if (it == wires.end()) {

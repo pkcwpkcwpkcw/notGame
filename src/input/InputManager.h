@@ -51,7 +51,7 @@ private:
         float dragThreshold = 5.0f;
         float doubleClickTime = 0.3f;
         float wireHitThreshold = 0.1f;
-        float portHitRadius = 0.2f;
+        float portHitRadius = 1.0f;  // Increased from 0.2f to 1.0f
         bool invertScroll = false;
     } m_settings;
     

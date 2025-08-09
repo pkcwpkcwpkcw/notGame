@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>
 #include <algorithm>
+#include <SDL.h>
 
 namespace Input {
 
@@ -13,7 +14,7 @@ class HitDetector {
 private:
     Circuit* m_circuit = nullptr;
     float m_wireHitThreshold = 0.1f;
-    float m_portHitRadius = 0.2f;
+    float m_portHitRadius = 1.0f;  // Increased port hit radius to 1.0f
     
     struct SpatialGrid {
         static constexpr int CELL_SIZE = 10;
@@ -86,19 +87,41 @@ public:
     
     HitResult detectHit(const glm::vec2& worldPos) const {
         if (!m_circuit) {
+            // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[HitDetector] No circuit!");
             return HitResult{ClickTarget::Empty, 0, 0, worldPos};
         }
         
         rebuildGridIfNeeded();
         
+        // Log number of gates (commented out to reduce spam)
+        // int gateCount = 0;
+        // for (auto it = m_circuit->gatesBegin(); it != m_circuit->gatesEnd(); ++it) {
+        //     gateCount++;
+        // }
+        // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[HitDetector] Checking hit at (%.2f, %.2f), %d gates in circuit", 
+        //             worldPos.x, worldPos.y, gateCount);
+        
+        // Check port hit first (more specific than gate hit)
+        for (auto it = m_circuit->gatesBegin(); it != m_circuit->gatesEnd(); ++it) {
+            const Gate& gate = it->second;
+            if (auto portHit = checkPortHit(worldPos, gate.id); portHit.type == ClickTarget::Port) {
+                // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[HitDetector] Port hit! Gate: %d, Port: %d", 
+                //            gate.id, portHit.portIndex);
+                return portHit;
+            }
+        }
+        
         if (auto gateHit = checkGateHit(worldPos); gateHit.type != ClickTarget::None) {
+            // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[HitDetector] Gate hit! ID: %d", gateHit.objectId);
             return gateHit;
         }
         
         if (auto wireHit = checkWireHit(worldPos); wireHit.type != ClickTarget::None) {
+            // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[HitDetector] Wire hit! ID: %d", wireHit.objectId);
             return wireHit;
         }
         
+        // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[HitDetector] No hit detected, returning Empty");
         return HitResult{ClickTarget::Empty, 0, 0, worldPos};
     }
     
@@ -109,8 +132,10 @@ public:
         if (!gate) return HitResult{};
         HitResult result{ClickTarget::None, gateId, FLT_MAX, worldPos};
         
+        // Check input ports
         for (int i = 0; i < 3; i++) {
-            glm::vec2 inputPos = glm::vec2(gate->position.x, gate->position.y) + glm::vec2(-0.4f, -0.3f + i * 0.3f);
+            Vec2 portPos = gate->getInputPortPosition(i);
+            glm::vec2 inputPos(portPos.x, portPos.y);
             float dist = glm::length(worldPos - inputPos);
             if (dist < m_portHitRadius && dist < result.distance) {
                 result.type = ClickTarget::Port;
@@ -121,12 +146,14 @@ public:
             }
         }
         
-        glm::vec2 outputPos = glm::vec2(gate->position.x, gate->position.y) + glm::vec2(0.4f, 0.0f);
+        // Check output port
+        Vec2 outPos = gate->getOutputPortPosition();
+        glm::vec2 outputPos(outPos.x, outPos.y);
         float dist = glm::length(worldPos - outputPos);
         if (dist < m_portHitRadius && dist < result.distance) {
             result.type = ClickTarget::Port;
             result.distance = dist;
-            result.portIndex = 0;
+            result.portIndex = -1;  // Output port uses -1
             result.isInput = false;
             result.hitPoint = outputPos;
         }
@@ -138,17 +165,29 @@ private:
     void rebuildGridIfNeeded() const {
         if (!m_gridDirty || !m_circuit) return;
         
+        // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[HitDetector] Rebuilding spatial grid...");
+        
         m_spatialGrid.clear();
         
+        int gateCount = 0;
         for (auto it = m_circuit->gatesBegin(); it != m_circuit->gatesEnd(); ++it) {
             const Gate& gate = it->second;
-            m_spatialGrid.insertGate(gate.id, glm::ivec2(gate.position.x, gate.position.y));
+            glm::ivec2 gridPos(gate.position.x, gate.position.y);
+            // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[HitDetector] Adding gate %d at grid (%d, %d)", 
+            //            gate.id, gridPos.x, gridPos.y);
+            m_spatialGrid.insertGate(gate.id, gridPos);
+            gateCount++;
         }
         
+        int wireCount = 0;
         for (auto it = m_circuit->wiresBegin(); it != m_circuit->wiresEnd(); ++it) {
             const Wire& wire = it->second;
             m_spatialGrid.insertWire(wire.id, wire.pathPoints);
+            wireCount++;
         }
+        
+        // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[HitDetector] Grid rebuilt with %d gates and %d wires", 
+        //            gateCount, wireCount);
         
         m_gridDirty = false;
     }
@@ -157,10 +196,16 @@ private:
         glm::ivec2 gridPos(std::floor(worldPos.x), std::floor(worldPos.y));
         uint64_t cellHash = m_spatialGrid.hashPosition(gridPos);
         
+        // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[HitDetector] checkGateHit at grid (%d, %d), hash: %llu", 
+        //             gridPos.x, gridPos.y, cellHash);
+        
         auto it = m_spatialGrid.gateIndex.find(cellHash);
         if (it == m_spatialGrid.gateIndex.end()) {
+            // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[HitDetector] No gates in this cell");
             return HitResult{};
         }
+        
+        // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[HitDetector] Found %zu gates in cell", it->second.size());
         
         for (uint32_t gateId : it->second) {
             const Gate* gate = m_circuit->getGate(gateId);
@@ -170,8 +215,13 @@ private:
                 glm::vec2 min = gatePos - glm::vec2(0.5f);
                 glm::vec2 max = gatePos + glm::vec2(0.5f);
                 
+                // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[HitDetector] Gate %d at (%.2f, %.2f), bounds: (%.2f,%.2f)-(%.2f,%.2f)", 
+                //            gateId, gatePos.x, gatePos.y, min.x, min.y, max.x, max.y);
+                
                 if (worldPos.x >= min.x && worldPos.x <= max.x &&
                     worldPos.y >= min.y && worldPos.y <= max.y) {
+                    // Only log actual hits
+                    // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[HitDetector] Gate %d HIT!", gateId);
                     return HitResult{ClickTarget::Gate, gateId, 0, gatePos};
                 }
             }

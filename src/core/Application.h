@@ -20,6 +20,8 @@ class PlacementManager;
 class SelectionManager;
 class GridMap;
 class GatePaletteUI;
+class WireManager;
+class CellWireManager;
 
 namespace Input {
     class InputManager;
@@ -107,6 +109,8 @@ private:
     std::unique_ptr<SelectionManager> m_selectionManager;
     std::unique_ptr<GridMap> m_gridMap;
     std::unique_ptr<GatePaletteUI> m_gatePaletteUI;
+    std::unique_ptr<WireManager> m_wireManager;
+    std::unique_ptr<CellWireManager> m_cellWireManager;
     
     uint32_t m_frameCount;
     float m_fpsUpdateTimer;

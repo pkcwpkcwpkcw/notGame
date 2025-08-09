@@ -315,9 +315,23 @@ std::vector<glm::vec2> WireRenderer::CalculateManhattanPath(const glm::vec2& sta
                                                             const glm::vec2& end) {
     std::vector<glm::vec2> path;
     
-    // 셀 중앙을 지나도록 조정 (0.5 오프셋 추가)
-    glm::vec2 adjustedStart = start + glm::vec2(0.5f, 0.5f);
-    glm::vec2 adjustedEnd = end + glm::vec2(0.5f, 0.5f);
+    // Cell-to-cell wires already have correct world coordinates, don't adjust
+    // Only add offset if coordinates appear to be grid positions (integers)
+    glm::vec2 adjustedStart = start;
+    glm::vec2 adjustedEnd = end;
+    
+    // Check if coordinates look like grid positions (close to integers)
+    bool isGridStart = (std::abs(start.x - std::round(start.x)) < 0.1f && 
+                        std::abs(start.y - std::round(start.y)) < 0.1f);
+    bool isGridEnd = (std::abs(end.x - std::round(end.x)) < 0.1f && 
+                      std::abs(end.y - std::round(end.y)) < 0.1f);
+    
+    if (isGridStart) {
+        adjustedStart = start + glm::vec2(0.5f, 0.5f);
+    }
+    if (isGridEnd) {
+        adjustedEnd = end + glm::vec2(0.5f, 0.5f);
+    }
     
     path.push_back(adjustedStart);
     

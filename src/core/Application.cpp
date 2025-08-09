@@ -4,6 +4,8 @@
 #include "Circuit.h"
 #include "Grid.h"
 #include "GridMap.h"
+#include "WireManager.h"
+#include "CellWireManager.h"
 #include "ui/ImGuiManager.h"
 #include "../ui/GatePaletteUI.h"
 #include "../game/PlacementManager.h"
@@ -16,6 +18,7 @@
 #include "../render/RenderTypes.h"
 #include "../render/Renderer.h"
 #include "../input/InputManager.h"
+#include "../input/WireInputHandler.h"
 #include <imgui.h>
 #include <iostream>
 
@@ -83,12 +86,17 @@ bool Application::initialize(const AppConfig& config) {
     m_placementManager = std::make_unique<PlacementManager>();
     m_selectionManager = std::make_unique<SelectionManager>();
     m_gatePaletteUI = std::make_unique<GatePaletteUI>();
+    m_wireManager = std::make_unique<WireManager>(m_circuit.get());
+    m_cellWireManager = std::make_unique<CellWireManager>(m_circuit.get());
     
     // Grid 시스템 생성 및 연결
     Grid* gridSystem = new Grid();
-    m_placementManager->initialize(m_circuit.get(), m_gridMap.get(), gridSystem);
+    m_placementManager->initialize(m_circuit.get(), m_gridMap.get(), gridSystem, m_cellWireManager.get());
     m_selectionManager->initialize(m_circuit.get(), m_gridMap.get(), gridSystem);
     m_gatePaletteUI->initialize(m_placementManager.get(), m_selectionManager.get());
+    
+    // WireManager 초기화
+    m_wireManager->initialize();
     
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Gate Placement System initialized successfully");
     
@@ -96,6 +104,41 @@ bool Application::initialize(const AppConfig& config) {
     m_inputManager = std::make_unique<Input::InputManager>();
     m_inputManager->initialize(m_camera.get(), m_circuit.get());
     m_inputManager->setViewport(config.windowWidth, config.windowHeight);
+    
+    // CellWireManager를 InputManager 이벤트에 연결
+    m_inputManager->subscribe<Input::DragEvent>([this](const Input::DragEvent& e) {
+        if (m_cellWireManager) {
+            Vec2 worldPos{e.currentWorld.x, e.currentWorld.y};
+            glm::vec2 glmWorldPos(worldPos.x, worldPos.y);
+            
+            switch (e.phase) {
+                case Input::DragPhase::Start:
+                    m_cellWireManager->onDragStart(glm::vec2(e.startWorld.x, e.startWorld.y));
+                    break;
+                case Input::DragPhase::Move:
+                    m_cellWireManager->onDragMove(glmWorldPos);
+                    break;
+                case Input::DragPhase::End:
+                    m_cellWireManager->onDragEnd(glmWorldPos);
+                    break;
+                default:
+                    break;
+            }
+        }
+    });
+    
+    m_inputManager->subscribe<Input::ClickEvent>([this](const Input::ClickEvent& e) {
+        if (m_wireManager) {
+            m_wireManager->onClick(e);
+        }
+    });
+    
+    m_inputManager->subscribe<Input::HoverEvent>([this](const Input::HoverEvent& e) {
+        if (m_wireManager) {
+            Vec2 worldPos{e.worldPos.x, e.worldPos.y};
+            m_wireManager->onMouseMove(worldPos);
+        }
+    });
     
     // InputManager 이벤트 콜백 설정
     m_inputManager->setOnClick([this](const Input::ClickEvent& e) {
@@ -788,6 +831,12 @@ void Application::render() {
     if (m_renderManager && m_circuit && (m_currentState == AppState::PLAYING || m_currentState == AppState::EDITOR)) {
         m_renderManager->BeginFrame();
         m_renderManager->RenderCircuit(*m_circuit);
+        
+        // CellWire 렌더링
+        if (m_cellWireManager) {
+            m_renderManager->RenderCellWires(m_cellWireManager->getAllWires());
+        }
+        
         m_renderManager->EndFrame();
         
         // Render gate preview AFTER everything else (on top)
@@ -804,6 +853,16 @@ void Application::render() {
             // Re-enable depth testing
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_TRUE);
+        }
+        
+        // Render wire preview when connecting
+        if (m_wireManager && m_wireManager->isConnecting()) {
+            const auto& previewPath = m_wireManager->getPreviewPath();
+            if (previewPath.size() >= 2) {
+                glm::vec2 start(previewPath[0].x, previewPath[0].y);
+                glm::vec2 end(previewPath.back().x, previewPath.back().y);
+                m_renderManager->RenderDraggingWire(start, end);
+            }
         }
     } else if (m_gridRenderer && m_camera && (m_currentState == AppState::PLAYING || m_currentState == AppState::EDITOR)) {
         m_gridRenderer->Render(*m_camera);

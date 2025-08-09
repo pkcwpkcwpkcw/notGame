@@ -2,12 +2,14 @@
 
 #include <memory>
 #include <vector>
+#include <unordered_map>
 #include "render/Renderer.h"
 #include "render/GridRenderer.h"
 #include "render/GateRenderer.h"
 #include "render/WireRenderer.h"
 #include "render/Camera.h"
 #include "core/Circuit.h"
+#include "core/CellWire.h"
 
 class Window;
 
@@ -23,6 +25,7 @@ public:
     void EndFrame();
     
     void RenderCircuit(const Circuit& circuit);
+    void RenderCellWires(const std::unordered_map<uint64_t, CellWire>& cellWires);
     void RenderDraggingWire(const glm::vec2& start, const glm::vec2& end);
     void RenderGatePreview(const glm::vec2& position, GateType type, bool isValid);
     
