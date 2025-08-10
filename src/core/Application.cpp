@@ -19,6 +19,7 @@
 #include "../render/Renderer.h"
 #include "../input/InputManager.h"
 #include "../input/WireInputHandler.h"
+#include "../simulation/CircuitSimulator.h"
 #include <imgui.h>
 #include <iostream>
 
@@ -98,7 +99,14 @@ bool Application::initialize(const AppConfig& config) {
     // WireManager 초기화
     m_wireManager->initialize();
     
+    // CircuitSimulator 초기화
+    m_circuitSimulator = std::make_unique<simulation::CircuitSimulator>(m_circuit.get());
+    m_circuitSimulator->setCellWireManager(m_cellWireManager.get());  // CellWireManager 연결
+    m_circuitSimulator->initialize();
+    m_circuitSimulator->start(); // 시뮬레이션 시작
+    
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Gate Placement System initialized successfully");
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Circuit Simulator initialized successfully");
     
     // InputManager 초기화
     m_inputManager = std::make_unique<Input::InputManager>();
@@ -541,6 +549,16 @@ void Application::update(float deltaTime) {
     // Update legacy input handler
     if (m_inputHandler) {
         m_inputHandler->Update(deltaTime);
+    }
+    
+    // Update Circuit Simulator
+    if (m_circuitSimulator) {
+        m_circuitSimulator->update(deltaTime);
+    }
+    
+    // Update CellWireManager signals
+    if (m_cellWireManager) {
+        m_cellWireManager->updateSignals();
     }
     
     m_imguiManager->BeginFrame();

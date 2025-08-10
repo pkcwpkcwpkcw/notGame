@@ -102,6 +102,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
         notgate_game  
         notgate_ui
         notgate_render
+        notgate_simulation
         notgate_utils
         Threads::Threads
     )

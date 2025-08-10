@@ -35,12 +35,14 @@ bool PlacementManager::validatePosition(Vec2i gridPos) const noexcept {
         return false;
     }
     
+    // 다른 게이트가 있으면 배치 불가 (와이어는 덮어씀)
     if (gridMap->isOccupied(gridPos)) {
         return false;
     }
     
+    // 와이어가 있으면 경고 로그만 출력 (배치는 허용하고 와이어 삭제)
     if (hasWireConflict(gridPos)) {
-        return false;
+        SDL_Log("[PlacementManager] Wire will be removed at (%d, %d) for gate placement", gridPos.x, gridPos.y);
     }
     
     return true;
@@ -188,5 +190,18 @@ bool PlacementManager::canPlaceAt(Vec2i pos) const noexcept {
 }
 
 bool PlacementManager::hasWireConflict(Vec2i pos) const noexcept {
-    return false;
+    if (!cellWireManager) {
+        return false;
+    }
+    
+    // 해당 위치에 와이어가 있는지 확인
+    glm::ivec2 glmPos(pos.x, pos.y);
+    const CellWire* wire = cellWireManager->getWireAt(glmPos);
+    bool hasWire = (wire != nullptr);
+    
+    if (hasWire) {
+        SDL_Log("[PlacementManager] Wire conflict detected at (%d, %d)", pos.x, pos.y);
+    }
+    
+    return hasWire;
 }

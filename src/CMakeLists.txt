@@ -6,6 +6,7 @@ file(GLOB_RECURSE RENDER_SOURCES "render/*.cpp")
 file(GLOB_RECURSE GAME_SOURCES "game/*.cpp")
 file(GLOB_RECURSE UI_SOURCES "ui/*.cpp")
 file(GLOB_RECURSE UTILS_SOURCES "utils/*.cpp")
+file(GLOB_RECURSE SIMULATION_SOURCES "simulation/*.cpp")
 
 # 정적 라이브러리 생성 (소스 파일이 있을 경우에만)
 if(CORE_SOURCES)
@@ -110,6 +111,44 @@ else()
     )
 endif()
 
+# Step 7: 시뮬레이션 시스템 라이브러리
+if(SIMULATION_SOURCES)
+    add_library(notgate_simulation STATIC ${SIMULATION_SOURCES})
+    target_include_directories(notgate_simulation PUBLIC 
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${OPENGL_INCLUDE_DIR}
+    )
+    target_link_libraries(notgate_simulation 
+        notgate_core
+        notgate_utils
+    )
+    
+    # SIMD 최적화 컴파일러 플래그 추가
+    if(MSVC)
+        target_compile_options(notgate_simulation PRIVATE /arch:AVX2)
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(notgate_simulation PRIVATE -mavx2 -mfma)
+    endif()
+    
+    # 성능 최적화 플래그 (Release 빌드에서)
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        if(MSVC)
+            target_compile_options(notgate_simulation PRIVATE /O2 /Ot /GL)
+            target_link_options(notgate_simulation PRIVATE /LTCG)
+        else()
+            target_compile_options(notgate_simulation PRIVATE -O3 -march=native -flto)
+            target_link_options(notgate_simulation PRIVATE -flto)
+        endif()
+    endif()
+    
+    message(STATUS "Added notgate_simulation library with SIMD optimizations")
+else()
+    add_library(notgate_simulation INTERFACE)
+    target_include_directories(notgate_simulation INTERFACE 
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+endif()
+
 # 실행 파일 생성 (이미 루트 CMakeLists.txt에서 처리하므로 주석 처리)
 # main.cpp가 있고 별도 실행 파일이 필요한 경우에만 활성화
 if(FALSE)  # 루트에서 이미 처리
@@ -168,6 +207,12 @@ if(UTILS_SOURCES)
     message(STATUS "notgate_utils: ${UTILS_SOURCES}")
 else()
     message(STATUS "notgate_utils: No source files (interface library)")
+endif()
+
+if(SIMULATION_SOURCES)
+    message(STATUS "notgate_simulation: ${SIMULATION_SOURCES}")
+else()
+    message(STATUS "notgate_simulation: No source files (interface library)")
 endif()
 message(STATUS "======================================")
 

@@ -206,7 +206,7 @@ void RenderManager::RenderCellWires(const std::unordered_map<uint64_t, CellWire>
             RenderWire segment;
             segment.start = centerPos;
             segment.end = glm::vec2(centerPos.x, centerPos.y - 0.5f);
-            segment.hasSignal = (cellWire.signalState == SignalState::HIGH);
+            segment.hasSignal = cellWire.hasSignal;
             segment.fromGate = Constants::INVALID_GATE_ID;
             segment.toGate = Constants::INVALID_GATE_ID;
             renderWires.push_back(segment);
@@ -215,7 +215,7 @@ void RenderManager::RenderCellWires(const std::unordered_map<uint64_t, CellWire>
             RenderWire segment;
             segment.start = centerPos;
             segment.end = glm::vec2(centerPos.x, centerPos.y + 0.5f);
-            segment.hasSignal = (cellWire.signalState == SignalState::HIGH);
+            segment.hasSignal = cellWire.hasSignal;
             segment.fromGate = Constants::INVALID_GATE_ID;
             segment.toGate = Constants::INVALID_GATE_ID;
             renderWires.push_back(segment);
@@ -224,7 +224,7 @@ void RenderManager::RenderCellWires(const std::unordered_map<uint64_t, CellWire>
             RenderWire segment;
             segment.start = centerPos;
             segment.end = glm::vec2(centerPos.x - 0.5f, centerPos.y);
-            segment.hasSignal = (cellWire.signalState == SignalState::HIGH);
+            segment.hasSignal = cellWire.hasSignal;
             segment.fromGate = Constants::INVALID_GATE_ID;
             segment.toGate = Constants::INVALID_GATE_ID;
             renderWires.push_back(segment);
@@ -233,7 +233,7 @@ void RenderManager::RenderCellWires(const std::unordered_map<uint64_t, CellWire>
             RenderWire segment;
             segment.start = centerPos;
             segment.end = glm::vec2(centerPos.x + 0.5f, centerPos.y);
-            segment.hasSignal = (cellWire.signalState == SignalState::HIGH);
+            segment.hasSignal = cellWire.hasSignal;
             segment.fromGate = Constants::INVALID_GATE_ID;
             segment.toGate = Constants::INVALID_GATE_ID;
             renderWires.push_back(segment);
@@ -244,7 +244,7 @@ void RenderManager::RenderCellWires(const std::unordered_map<uint64_t, CellWire>
             RenderWire dot;
             dot.start = centerPos;
             dot.end = centerPos + glm::vec2(0.01f, 0.01f);  // 아주 작은 선분
-            dot.hasSignal = (cellWire.signalState == SignalState::HIGH);
+            dot.hasSignal = cellWire.hasSignal;
             dot.fromGate = Constants::INVALID_GATE_ID;
             dot.toGate = Constants::INVALID_GATE_ID;
             renderWires.push_back(dot);

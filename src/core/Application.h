@@ -23,6 +23,10 @@ class GatePaletteUI;
 class WireManager;
 class CellWireManager;
 
+namespace simulation {
+    class CircuitSimulator;
+}
+
 namespace Input {
     class InputManager;
 }
@@ -111,6 +115,7 @@ private:
     std::unique_ptr<GatePaletteUI> m_gatePaletteUI;
     std::unique_ptr<WireManager> m_wireManager;
     std::unique_ptr<CellWireManager> m_cellWireManager;
+    std::unique_ptr<simulation::CircuitSimulator> m_circuitSimulator;
     
     uint32_t m_frameCount;
     float m_fpsUpdateTimer;

@@ -361,7 +361,7 @@ std::vector<glm::vec2> WireRenderer::CalculateSmartPath(const glm::vec2& start,
 
 glm::vec4 WireRenderer::GetWireColor(const RenderWire& wire) const {
     if (wire.hasSignal) {
-        return glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);  // 초록색 (신호 있음)
+        return glm::vec4(1.0f, 0.2f, 0.2f, 1.0f);  // 빨간색 (신호 있음)
     }
     return glm::vec4(0.4f, 0.4f, 0.4f, 1.0f);  // 회색 (신호 없음)
 }

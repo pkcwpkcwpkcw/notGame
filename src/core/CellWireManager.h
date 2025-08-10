@@ -2,6 +2,8 @@
 #include "CellWire.h"
 #include "Types.h"
 #include <unordered_map>
+#include <set>
+#include <vector>
 #include <glm/glm.hpp>
 #include <SDL.h>
 
@@ -57,4 +59,8 @@ private:
     // 두 셀 사이의 방향 계산
     WireDirection getDirection(const glm::ivec2& from, const glm::ivec2& to) const;
     WireDirection getOppositeDirection(WireDirection dir) const;
+    
+    // 신호 전파 헬퍼 함수들
+    void propagateSignal(const glm::ivec2& startPos);
+    void checkGateInputs(const glm::ivec2& wirePos);
 };

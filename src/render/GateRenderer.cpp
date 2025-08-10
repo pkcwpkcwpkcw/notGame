@@ -341,15 +341,21 @@ glm::vec4 GateRenderer::GetGateColor(const Gate& gate) const {
         SDL_Log("[GateRenderer] Rendering selected gate %u with yellow color", gate.id);
         return glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);  // 노란색
     }
-    // NOT 게이트 본체는 진한 회색
+    
+    // 출력 신호가 HIGH이면 빨간색
+    if (gate.currentOutput == SignalState::HIGH) {
+        return glm::vec4(1.0f, 0.2f, 0.2f, 1.0f);  // 빨간색
+    }
+    
+    // 기본 상태 (LOW)는 진한 회색
     return glm::vec4(0.4f, 0.4f, 0.4f, 1.0f);
 }
 
 glm::vec4 GateRenderer::GetPortColor(bool hasSignal) const {
     if (hasSignal) {
-        return glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
+        return glm::vec4(1.0f, 0.2f, 0.2f, 1.0f);  // 빨간색
     }
-    return glm::vec4(0.3f, 0.3f, 0.3f, 1.0f);
+    return glm::vec4(0.3f, 0.3f, 0.3f, 1.0f);  // 회색
 }
 
 std::vector<Gate> GateRenderer::FrustumCull(const std::vector<Gate>& gates, const Camera& camera) const {

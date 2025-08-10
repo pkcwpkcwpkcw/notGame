@@ -32,6 +32,7 @@ struct CellWire {
     WireDirection connections{WireDirection::None};  // 연결된 방향들
     SignalState signalState{SignalState::LOW};       // 신호 상태
     bool exists{false};               // 이 셀에 와이어가 있는지
+    bool hasSignal{false};            // HIGH 신호가 있는지
     
     // 특정 방향으로 연결되어 있는지 확인
     bool hasConnection(WireDirection dir) const {

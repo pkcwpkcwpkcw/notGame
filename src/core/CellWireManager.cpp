@@ -213,7 +213,123 @@ const CellWire* CellWireManager::getWireAt(const glm::ivec2& gridPos) const {
 }
 
 void CellWireManager::updateSignals() {
-    // TODO: 신호 전파 로직 구현
+    if (!m_circuit) return;
+    
+    // 모든 와이어의 신호 상태 초기화
+    for (auto& [key, wire] : m_cellWires) {
+        wire.hasSignal = false;
+    }
+    
+    // 게이트의 출력 신호를 인접 와이어로 전파
+    for (auto it = m_circuit->gatesBegin(); it != m_circuit->gatesEnd(); ++it) {
+        const Gate& gate = it->second;
+        
+        // 게이트가 HIGH 출력일 때만 신호 전파
+        if (gate.currentOutput == SignalState::HIGH) {
+            // 게이트의 출력 포트 위치 계산
+            Vec2 outputPortPos = gate.getOutputPortPosition();
+            glm::ivec2 outputCellPos(std::floor(outputPortPos.x), std::floor(outputPortPos.y));
+            
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                       "[CellWireManager] Gate at (%.1f, %.1f) outputting HIGH to cell (%d, %d)",
+                       gate.position.x, gate.position.y, outputCellPos.x, outputCellPos.y);
+            
+            // 해당 위치의 와이어에 신호 설정
+            CellWire* wire = getWireAt(outputCellPos);
+            if (wire) {
+                wire->hasSignal = true;
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                           "[CellWireManager] Setting signal HIGH at wire (%d, %d)",
+                           outputCellPos.x, outputCellPos.y);
+                propagateSignal(outputCellPos);  // 연결된 와이어로 신호 전파
+            } else {
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                           "[CellWireManager] No wire found at output position (%d, %d)",
+                           outputCellPos.x, outputCellPos.y);
+            }
+        }
+    }
+}
+
+void CellWireManager::propagateSignal(const glm::ivec2& startPos) {
+    std::vector<glm::ivec2> toVisit;
+    std::set<uint64_t> visited;
+    
+    toVisit.push_back(startPos);
+    visited.insert(gridToKey(startPos));
+    
+    while (!toVisit.empty()) {
+        glm::ivec2 currentPos = toVisit.back();
+        toVisit.pop_back();
+        
+        CellWire* currentWire = getWireAt(currentPos);
+        if (!currentWire) continue;
+        
+        currentWire->hasSignal = true;
+        
+        // 연결된 인접 와이어들로 신호 전파
+        if (currentWire->hasConnection(WireDirection::Up)) {
+            glm::ivec2 upPos = currentPos + glm::ivec2(0, -1);
+            uint64_t upKey = gridToKey(upPos);
+            if (visited.find(upKey) == visited.end()) {
+                visited.insert(upKey);
+                toVisit.push_back(upPos);
+            }
+        }
+        if (currentWire->hasConnection(WireDirection::Down)) {
+            glm::ivec2 downPos = currentPos + glm::ivec2(0, 1);
+            uint64_t downKey = gridToKey(downPos);
+            if (visited.find(downKey) == visited.end()) {
+                visited.insert(downKey);
+                toVisit.push_back(downPos);
+            }
+        }
+        if (currentWire->hasConnection(WireDirection::Left)) {
+            glm::ivec2 leftPos = currentPos + glm::ivec2(-1, 0);
+            uint64_t leftKey = gridToKey(leftPos);
+            if (visited.find(leftKey) == visited.end()) {
+                visited.insert(leftKey);
+                toVisit.push_back(leftPos);
+            }
+        }
+        if (currentWire->hasConnection(WireDirection::Right)) {
+            glm::ivec2 rightPos = currentPos + glm::ivec2(1, 0);
+            uint64_t rightKey = gridToKey(rightPos);
+            if (visited.find(rightKey) == visited.end()) {
+                visited.insert(rightKey);
+                toVisit.push_back(rightPos);
+            }
+        }
+        
+        // 게이트 입력 포트 확인
+        checkGateInputs(currentPos);
+    }
+}
+
+void CellWireManager::checkGateInputs(const glm::ivec2& wirePos) {
+    if (!m_circuit) return;
+    
+    // 와이어가 게이트의 입력 포트 근처에 있는지 확인
+    for (auto it = m_circuit->gatesBegin(); it != m_circuit->gatesEnd(); ++it) {
+        Gate& gate = it->second;
+        
+        // 3개의 입력 포트 위치 확인
+        for (int port = 0; port < 3; ++port) {
+            Vec2 inputPortPos = gate.getInputPortPosition(port);
+            glm::ivec2 inputCellPos(std::floor(inputPortPos.x), std::floor(inputPortPos.y));
+            
+            // 와이어 위치와 입력 포트 위치가 일치하는지 확인
+            if (wirePos == inputCellPos) {
+                // 해당 포트에 신호가 있음을 표시
+                gate.isDirty = true;
+                
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                           "[CellWireManager] Wire at (%d, %d) connected to gate input port %d",
+                           wirePos.x, wirePos.y, port);
+                break;
+            }
+        }
+    }
 }
 
 WireDirection CellWireManager::getDirection(const glm::ivec2& from, const glm::ivec2& to) const {

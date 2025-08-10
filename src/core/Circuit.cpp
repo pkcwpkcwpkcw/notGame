@@ -12,6 +12,7 @@ Result<GateId> Circuit::addGate(Vec2 position) noexcept {
     gate.id = nextGateId++;
     gate.type = GateType::NOT;
     gate.position = position;
+    gate.currentOutput = SignalState::HIGH;  // NOT 게이트 기본 출력은 HIGH
     
     gates[gate.id] = std::move(gate);
     needsPropagation = true;
@@ -144,21 +145,17 @@ WireId Circuit::getWireAt(Vec2 position, float tolerance) const noexcept {
 void Circuit::update(float deltaTime) noexcept {
     if (isPaused) return;
     
-    for (auto& [id, gate] : gates) {
-        gate.update(deltaTime);
-    }
-    
-    if (needsPropagation || !dirtyGates.empty()) {
-        propagateSignals();
-    }
+    // CircuitSimulator가 활성화되어 있으면 Circuit의 자체 시뮬레이션 비활성화
+    // CircuitSimulator가 모든 신호 처리를 담당
     
     simulationTime += deltaTime;
 }
 
 void Circuit::reset() noexcept {
     for (auto& [id, gate] : gates) {
-        gate.currentOutput = SignalState::LOW;
-        gate.pendingOutput = SignalState::LOW;
+        // NOT 게이트는 기본적으로 HIGH 출력
+        gate.currentOutput = (gate.type == GateType::NOT) ? SignalState::HIGH : SignalState::LOW;
+        gate.pendingOutput = gate.currentOutput;
         gate.delayTimer = 0.0f;
         gate.isDelayActive = false;
         gate.isDirty = true;
